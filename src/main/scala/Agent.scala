@@ -111,11 +111,11 @@ class ChessHumanPlayer extends Agent[ChessMove] {
 							piece match {
 								case Pawn(c, n) => {
 									val move = promoted match {
-										case "Rook" => Promotion(Pawn(c, n), Rook(color, chessState.turn + 3), dest)
-										case "Knight" => Promotion(Pawn(c, n), Knight(color, chessState.turn + 3), dest)
-										case "Bishop" => Promotion(Pawn(c, n), Bishop(color, chessState.turn + 3), dest)
-										case "Queen" => Promotion(Pawn(c, n), Queen(color, chessState.turn + 3), dest)
-										case "King" => Promotion(Pawn(c, n), King(color, chessState.turn + 3), dest)
+										case "Rook" => Promotion(src, Rook(color, chessState.turn + 3), dest)
+										case "Knight" => Promotion(src, Knight(color, chessState.turn + 3), dest)
+										case "Bishop" => Promotion(src, Bishop(color, chessState.turn + 3), dest)
+										case "Queen" => Promotion(src, Queen(color, chessState.turn + 3), dest)
+										case "King" => Promotion(src, King(color, chessState.turn + 3), dest)
 										case _ => null
 									}
 									if(move == null) wrongFormat("wrong coding for promoted piece")

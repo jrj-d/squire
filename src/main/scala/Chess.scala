@@ -34,7 +34,7 @@ case class Position(val row: Int, val column: Int)
 sealed abstract class ChessMove
 case class RegularChessMove(val origin: Position, val destination: Position) extends ChessMove
 case class Castling(val king: King, val rook: Rook) extends ChessMove
-case class Promotion(val pawn: Pawn, val promoted: ChessPiece, val destination: Position) extends ChessMove
+case class Promotion(val origin: Position, val promoted: ChessPiece, val destination: Position) extends ChessMove
 
 
 class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positions: Map[ChessPiece, Position], val castlingRights: Array[Array[Boolean]]) extends GameState[ChessMove]{
@@ -83,12 +83,12 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 val color_code = if(king.color == White) 0 else 1
                 val kingPos = positions(king)
                 val rookPos = positions(rook)
-                if(kingPos.row != row || kingPos.column != 4) throw new IllegalArgumentException
-                if(rookPos.row != row) throw new IllegalArgumentException
+                if(kingPos.row != row || kingPos.column != 4) throw new IllegalArgumentException("castling: king not in the right place")
+                if(rookPos.row != row) throw new IllegalArgumentException("castling: rook not in the right row")
                 if(rookPos.column == 0) {
                     newBoard(row)(4) = null
                     newBoard(row)(0) = null
-                    if(board(row)(3) != null || board(row)(2) != null) throw new IllegalArgumentException
+                    if(board(row)(3) != null || board(row)(2) != null) throw new IllegalArgumentException("castling: some pieces between rook and king")
                     newBoard(row)(3) = rook
                     newBoard(row)(2) = king
                     newCastlingRights(color_code)(0) = false
@@ -97,7 +97,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 } else if(rookPos.column == 7) {
                     newBoard(row)(4) = null
                     newBoard(row)(7) = null
-                    if(board(row)(5) != null || board(row)(6) != null) throw new IllegalArgumentException
+                    if(board(row)(5) != null || board(row)(6) != null) throw new IllegalArgumentException("castling: some pieces between rook and king")
                     newBoard(row)(5) = rook
                     newBoard(row)(6) = king
                     newCastlingRights(color_code)(0) = false
@@ -105,9 +105,13 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     new ChessState(turn + 1, newBoard, positions + (rook -> Position(row, 5)) + (king -> Position(row, 6)), newCastlingRights)
                 } else throw new IllegalArgumentException
             }
-            case Promotion(pawn, promoted, destination) => {
-                val oldPos = positions(pawn)
-                newBoard(oldPos.row)(oldPos.column) = null
+            case Promotion(origin, promoted, destination) => {
+                val pawn = getPiece(origin)
+                pawn match {
+                    case _: Pawn => ()
+                    case _ => throw new IllegalArgumentException("promotion: piece is not a pawn")
+                }
+                newBoard(origin.row)(origin.column) = null
                 var deletedPiece = board(destination.row)(destination.column)
                 deletedPiece = if(deletedPiece != null) deletedPiece else Pawn(White, -1) // fake piece to avoid if statement
                 newBoard(destination.row)(destination.column) = promoted
@@ -283,10 +287,10 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                         output ::= move
                         if(position.row + direction == end_row) { // promotions
                             output :::= List(
-                                Promotion(Pawn(c, n), Rook(color, turn + 3), Position(position.row + direction, position.column)),
-                                Promotion(Pawn(c, n), Knight(color, turn + 3), Position(position.row + direction, position.column)),
-                                Promotion(Pawn(c, n), Bishop(color, turn + 3), Position(position.row + direction, position.column)),
-                                Promotion(Pawn(c, n), Queen(color, turn + 3), Position(position.row + direction, position.column))
+                                Promotion(position, Rook(color, turn + 3), Position(position.row + direction, position.column)),
+                                Promotion(position, Knight(color, turn + 3), Position(position.row + direction, position.column)),
+                                Promotion(position, Bishop(color, turn + 3), Position(position.row + direction, position.column)),
+                                Promotion(position, Queen(color, turn + 3), Position(position.row + direction, position.column))
                             )
                         }
                     }
@@ -308,10 +312,10 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                                 output ::= move
                                 if(position.row + direction == end_row) { // promotions
                                     output :::= List(
-                                        Promotion(Pawn(c, n), Rook(color, turn + 3), Position(position.row + direction, position.column + shift)),
-                                        Promotion(Pawn(c, n), Knight(color, turn + 3), Position(position.row + direction, position.column + shift)),
-                                        Promotion(Pawn(c, n), Bishop(color, turn + 3), Position(position.row + direction, position.column + shift)),
-                                        Promotion(Pawn(c, n), Queen(color, turn + 3), Position(position.row + direction, position.column + shift))
+                                        Promotion(position, Rook(color, turn + 3), Position(position.row + direction, position.column + shift)),
+                                        Promotion(position, Knight(color, turn + 3), Position(position.row + direction, position.column + shift)),
+                                        Promotion(position, Bishop(color, turn + 3), Position(position.row + direction, position.column + shift)),
+                                        Promotion(position, Queen(color, turn + 3), Position(position.row + direction, position.column + shift))
                                     )
                                 }
                             }
