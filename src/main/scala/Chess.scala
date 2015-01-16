@@ -1,9 +1,9 @@
 // current limitations:
-// + en passant is not implemented
 // + three-fold repetion not implemented
 // + fifty-move rule not implemented
 //
 // todo:
+// parseFEN
 // implement xboard client
 
 
@@ -666,4 +666,81 @@ object ChessState {
 
     	new ChessState(0, board, positions, castlingRights, None)
 	}
+
+    val pattern = """([a-h])([1-8])""".r
+
+    def decodeAlgebraicNotation(code: String): Option[Position] = {
+        code match {
+            case pattern(col_str, row_str) => Some(Position((row_str.charAt(0) - '1'):Int, (col_str.charAt(0) - 'a'):Int))
+            case _ => None
+        }
+    }
+
+    def parseFen(code: String) = {
+
+        implicit def char2str(c: Char) = c.toString
+
+        val words = code.split(" ")
+        if(words.length != 6) throw new IllegalArgumentException("Fen: wrong number of fields")
+
+        val castlingRights = Array.fill[Boolean](2, 2)(false)
+        val board = Array.ofDim[ChessPiece](8, 8)
+        var positions: Map[ChessPiece, Position] = Map()
+
+        // parse board description
+        var row = 7
+        var col = 0
+        var indices: scala.collection.mutable.Map[Char, Int] = scala.collection.mutable.Map().withDefaultValue(0)
+        for(c <- words(0)) {
+            c match {
+                case '/' => {
+                    row -= 1
+                    col = 0
+                }
+                case c if (c - '0' >= 1 && c - '0' <= 8) => col += c - '0'
+                case _ => {
+                    c match {
+                        case 'p' => positions = addPiece(board, positions, Pawn(Black, indices(c)), Position(row, col))
+                        case 'r' => positions = addPiece(board, positions, Rook(Black, indices(c)), Position(row, col))
+                        case 'n' => positions = addPiece(board, positions, Knight(Black, indices(c)), Position(row, col))
+                        case 'b' => positions = addPiece(board, positions, Bishop(Black, indices(c)), Position(row, col))
+                        case 'q' => positions = addPiece(board, positions, Queen(Black, indices(c)), Position(row, col))
+                        case 'k' => positions = addPiece(board, positions, King(Black), Position(row, col))
+                        case 'P' => positions = addPiece(board, positions, Pawn(White, indices(c)), Position(row, col))
+                        case 'R' => positions = addPiece(board, positions, Rook(White, indices(c)), Position(row, col))
+                        case 'N' => positions = addPiece(board, positions, Knight(White, indices(c)), Position(row, col))
+                        case 'B' => positions = addPiece(board, positions, Bishop(White, indices(c)), Position(row, col))
+                        case 'Q' => positions = addPiece(board, positions, Queen(White, indices(c)), Position(row, col))
+                        case 'K' => positions = addPiece(board, positions, King(White), Position(row, col))
+                        case d => throw new IllegalArgumentException("Fen: did not understand board description: " + d)
+                    }
+                    indices(c) += 1
+                    col += 1
+                }
+            }
+        }
+
+        // parse castling rights
+        for(c <- words(2)) {
+            c match {
+                case 'Q' => castlingRights(0)(0) = true
+                case 'K' => castlingRights(0)(1) = true
+                case 'q' => castlingRights(1)(0) = true
+                case 'k' => castlingRights(1)(1) = true
+                case '-' => ()
+                case _ => throw new IllegalArgumentException("Fen: did not understand castling rights")
+            }
+        }
+
+        // parse en passant marker
+        val enPassantPosition = words(3) match {
+            case "-" => None
+            case s => decodeAlgebraicNotation(s)
+        }
+
+        // parse turn
+        val turn = 2 * (words(5).toInt - 1) + ( if(words(1) == "b") 1 else 0 )
+
+        new ChessState(turn, board, positions, castlingRights, enPassantPosition)
+    }
 }
