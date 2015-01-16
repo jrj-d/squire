@@ -2,6 +2,12 @@
 // + en passant is not implemented
 // + three-fold repetion not implemented
 // + fifty-move rule not implemented
+//
+// todo:
+// centralize calls to isInCheck in possibleMoves
+// transform promoted piece in Promotion to something without id
+// implement en passant
+// implement xboard client
 
 
 package chess_buddy.chess
