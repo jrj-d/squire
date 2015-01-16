@@ -4,7 +4,6 @@
 // + fifty-move rule not implemented
 //
 // todo:
-// centralize calls to isInCheck in possibleMoves
 // transform promoted piece in Promotion to something without id
 // implement en passant
 // implement xboard client
@@ -271,13 +270,11 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
             var m = 1
             val Position(x, y) = init
             while(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy) == null) {
-                val move = RegularChessMove(init, Position(x + m * dx, y + m * dy))
-                if( !apply(move).isInCheck(piece.color) ) output ::= move
+                output ::= RegularChessMove(init, Position(x + m * dx, y + m * dy))
                 m += 1
             }
             if(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy).color != piece.color) {
-                val move = RegularChessMove(init, Position(x + m * dx, y + m * dy))
-                if( !apply(move).isInCheck(piece.color) ) output ::= move
+                output ::= RegularChessMove(init, Position(x + m * dx, y + m * dy))
             }
             output
         }
@@ -292,24 +289,20 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 val direction = if(color == White) 1 else -1
                 val end_row = if(color == White) 7 else 0
                 if(withinBoard(position.row + direction) && board(position.row + direction)(position.column) == null) { // normal forward move
-                    val move = RegularChessMove(position, Position(position.row + direction, position.column))
-                    if( !apply(move).isInCheck(color) ) {
-                        output ::= move
-                        if(position.row + direction == end_row) { // promotions
-                            output :::= List(
-                                Promotion(position, Rook(color, turn + 3), Position(position.row + direction, position.column)),
-                                Promotion(position, Knight(color, turn + 3), Position(position.row + direction, position.column)),
-                                Promotion(position, Bishop(color, turn + 3), Position(position.row + direction, position.column)),
-                                Promotion(position, Queen(color, turn + 3), Position(position.row + direction, position.column))
-                            )
-                        }
+                    output ::= RegularChessMove(position, Position(position.row + direction, position.column))
+                    if(position.row + direction == end_row) { // promotions
+                        output :::= List(
+                            Promotion(position, Rook(color, turn + 3), Position(position.row + direction, position.column)),
+                            Promotion(position, Knight(color, turn + 3), Position(position.row + direction, position.column)),
+                            Promotion(position, Bishop(color, turn + 3), Position(position.row + direction, position.column)),
+                            Promotion(position, Queen(color, turn + 3), Position(position.row + direction, position.column))
+                        )
                     }
                 }
                 val init_row = if(color == White) 1 else 6
                 if(position.row == init_row) { // initial double speed forward move
                     if(board(init_row + direction)(position.column) == null && board(init_row + 2 * direction)(position.column) == null) {
-                        val move = RegularChessMove(position, Position(position.row + 2 * direction, position.column))
-                        if( !apply(move).isInCheck(color) ) output ::= move
+                        output ::= RegularChessMove(position, Position(position.row + 2 * direction, position.column))
                     }
                 }
                 if(withinBoard(position.row + direction)) { // capture move
@@ -317,17 +310,14 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                         if(withinBoard(position.column + shift)
                            && board(position.row + direction)(position.column + shift) != null
                            && board(position.row + direction)(position.column + shift).color != color) {
-                            val move = RegularChessMove(position, Position(position.row + direction, position.column + shift))
-                            if( !apply(move).isInCheck(color) ) {
-                                output ::= move
-                                if(position.row + direction == end_row) { // promotions
-                                    output :::= List(
-                                        Promotion(position, Rook(color, turn + 3), Position(position.row + direction, position.column + shift)),
-                                        Promotion(position, Knight(color, turn + 3), Position(position.row + direction, position.column + shift)),
-                                        Promotion(position, Bishop(color, turn + 3), Position(position.row + direction, position.column + shift)),
-                                        Promotion(position, Queen(color, turn + 3), Position(position.row + direction, position.column + shift))
-                                    )
-                                }
+                            output ::= RegularChessMove(position, Position(position.row + direction, position.column + shift))
+                            if(position.row + direction == end_row) { // promotions
+                                output :::= List(
+                                    Promotion(position, Rook(color, turn + 3), Position(position.row + direction, position.column + shift)),
+                                    Promotion(position, Knight(color, turn + 3), Position(position.row + direction, position.column + shift)),
+                                    Promotion(position, Bishop(color, turn + 3), Position(position.row + direction, position.column + shift)),
+                                    Promotion(position, Queen(color, turn + 3), Position(position.row + direction, position.column + shift))
+                                )
                             }
                         }
                     }
@@ -349,8 +339,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                         if(withinBoard(position.row + dx) && withinBoard(position.column + dy)) {
                             val destPiece = board(position.row + dx)(position.column + dy)
                             if(destPiece == null || destPiece.color != color) {
-                                val move = RegularChessMove(position, Position(position.row + dx, position.column + dy))
-                                if( !apply(move).isInCheck(color) ) output ::= move
+                                output ::= RegularChessMove(position, Position(position.row + dx, position.column + dy))
                             }
                         }
                     }
@@ -383,8 +372,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                         if(withinBoard(position.row + dx) && withinBoard(position.column + dy)) {
                             val destPiece = board(position.row + dx)(position.column + dy)
                             if(destPiece == null || destPiece.color != color) {
-                                val move = RegularChessMove(position, Position(position.row + dx, position.column + dy))
-                                if( !apply(move).isInCheck(color) ) output ::= move
+                                output ::= RegularChessMove(position, Position(position.row + dx, position.column + dy))
                             }
                         }
                     }
@@ -393,8 +381,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     if(withinBoard(position.row + dx)) {
                         val destPiece = board(position.row + dx)(position.column)
                         if(destPiece == null || destPiece.color != color) {
-                            val move = RegularChessMove(position, Position(position.row + dx, position.column))
-                            if( !apply(move).isInCheck(color) ) output ::= move
+                            output ::= RegularChessMove(position, Position(position.row + dx, position.column))
                         }
                     }
                 }
@@ -408,21 +395,19 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
     def possibleMoves(): List[ChessMove] = {
 
         val color = if(turn % 2 == 0) White else Black
-        var output = positions.keys.filter(_.color == color).flatMap(listMovesOf(_)).toList
+        var moves = positions.keys.filter(_.color == color).flatMap(listMovesOf(_)).toList
 
         // castling
         val row = if(color == White) 0 else 7
         val color_code = if(color == White) 0 else 1
         if(castlingRights(color_code)(0) && (1 to 3).map(board(row)(_) == null).reduceLeft(_ && _)) {
-            val move = Castling(Position(row, 4), Position(row, 0))
-            if( !apply(move).isInCheck(color) ) output ::= move
+            moves ::= Castling(Position(row, 4), Position(row, 0))
         }
         if(castlingRights(color_code)(1) && (5 to 6).map(board(row)(_) == null).reduceLeft(_ && _)) {
-            val move = Castling(Position(row, 4), Position(row, 7))
-            if( !apply(move).isInCheck(color) ) output ::= move
+            moves ::= Castling(Position(row, 4), Position(row, 7))
         }
 
-        output
+        moves.filter(!apply(_).isInCheck(color))
     }
 
     def evaluate(): Option[Int] = {
