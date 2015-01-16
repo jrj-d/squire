@@ -76,12 +76,14 @@ class ChessHumanPlayer extends Agent[ChessMove] {
 			val input = readLine("Your move? ")
 			input match {
 				case "left castling" => {
-					val move = Castling(King(color, 0), Rook(color, 0))
+					val row = if(color == White) 0 else 7
+					val move = Castling(Position(row, 4), Position(row, 0))
 					if(moves.contains(move)) return move
 					else forbidden("you cannot perform a left castling")
 				}
 				case "right castling" => {
-					val move = Castling(King(color, 0), Rook(color, 1))
+					val row = if(color == White) 0 else 7
+					val move = Castling(Position(row, 4), Position(row, 7))
 					if(moves.contains(move)) return move
 					else forbidden("you cannot perform a right castling")
 				}
@@ -115,7 +117,6 @@ class ChessHumanPlayer extends Agent[ChessMove] {
 										case "Knight" => Promotion(src, Knight(color, chessState.turn + 3), dest)
 										case "Bishop" => Promotion(src, Bishop(color, chessState.turn + 3), dest)
 										case "Queen" => Promotion(src, Queen(color, chessState.turn + 3), dest)
-										case "King" => Promotion(src, King(color, chessState.turn + 3), dest)
 										case _ => null
 									}
 									if(move == null) wrongFormat("wrong coding for promoted piece")

@@ -20,12 +20,12 @@ import Color._
 
 
 sealed abstract class ChessPiece(val color: Color)
-case class Pawn(override val color: Color, number: Int) extends ChessPiece(color)
-case class King(override val color: Color, number: Int) extends ChessPiece(color)
-case class Queen(override val color: Color, number: Int) extends ChessPiece(color)
-case class Rook(override val color: Color, number: Int) extends ChessPiece(color)
-case class Knight(override val color: Color, number: Int) extends ChessPiece(color)
-case class Bishop(override val color: Color, number: Int) extends ChessPiece(color)
+case class Pawn(override val color: Color, id: Int) extends ChessPiece(color)
+case class King(override val color: Color) extends ChessPiece(color)
+case class Queen(override val color: Color, id: Int) extends ChessPiece(color)
+case class Rook(override val color: Color, id: Int) extends ChessPiece(color)
+case class Knight(override val color: Color, id: Int) extends ChessPiece(color)
+case class Bishop(override val color: Color, id: Int) extends ChessPiece(color)
 
 
 case class Position(val row: Int, val column: Int)
@@ -33,7 +33,7 @@ case class Position(val row: Int, val column: Int)
 
 sealed abstract class ChessMove
 case class RegularChessMove(val origin: Position, val destination: Position) extends ChessMove
-case class Castling(val king: King, val rook: Rook) extends ChessMove
+case class Castling(val kingPos: Position, val rookPos: Position) extends ChessMove
 case class Promotion(val origin: Position, val promoted: ChessPiece, val destination: Position) extends ChessMove
 
 
@@ -57,32 +57,36 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 val piece = getPiece(origin)
                 newBoard(origin.row)(origin.column) = null
                 var deletedPiece = getPiece(destination)
-                if(deletedPiece == King(White, 0) || deletedPiece == King(Black, 0)) throw new IllegalArgumentException("king deleted")
+                if(deletedPiece == King(White) || deletedPiece == King(Black)) throw new IllegalArgumentException("king deleted")
                 deletedPiece = if(deletedPiece != null) deletedPiece else Pawn(White, -1) // fake piece to avoid if statement
                 newBoard(destination.row)(destination.column) = piece
 
                 // handle castling rights
-                for(color_code <- 0 to 1) {
-                    val color = if(color_code == 0) White else Black
-                    if(piece == King(color, 0)) {
+                val color = piece.color
+                val color_code = if(color == White) 0 else 1
+                piece match {
+                    case King(c) if c == color => {
                         newCastlingRights(color_code)(0) = false
                         newCastlingRights(color_code)(1) = false
                     }
-                    for(index <- 0 to 1) {
-                        if(piece == Rook(color, index)) {
-                            newCastlingRights(color_code)(index) = false
-                        }
+                    case Rook(c, _) if c == color => {
+                        val row = if(color == White) 0 else 7
+                        if(origin.row == row && origin.column == 0) newCastlingRights(color_code)(0) = false
+                        if(origin.row == row && origin.column == 7) newCastlingRights(color_code)(1) = false
                     }
+                    case _ => ()
                 }
 
                 new ChessState(turn + 1, newBoard, positions + (piece -> destination) - deletedPiece, newCastlingRights)
             }
 
-            case Castling(king, rook) => {
+            case Castling(kingPos, rookPos) => {
+                val king = getPiece(kingPos)
+                val rook = getPiece(rookPos)
+                if(king == null)  throw new IllegalArgumentException("castling: king is not where you said")
+                if(rook == null)  throw new IllegalArgumentException("castling: there is no rook where you said")
                 val row = if(king.color == White) 0 else 7
                 val color_code = if(king.color == White) 0 else 1
-                val kingPos = positions(king)
-                val rookPos = positions(rook)
                 if(kingPos.row != row || kingPos.column != 4) throw new IllegalArgumentException("castling: king not in the right place")
                 if(rookPos.row != row) throw new IllegalArgumentException("castling: rook not in the right row")
                 if(rookPos.column == 0) {
@@ -167,18 +171,18 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     }
                 } else false
             }
-            case King(_, _) => (abs(dx) <= 1 && abs(dy) <= 1)
+            case King(_) => (abs(dx) <= 1 && abs(dy) <= 1)
     	}
     }
 
     // old version of isInCheck using threatens is 50% slower
     // def isInCheck(color: Color) = {
-    //     val king_pos = positions(King(color, 0))
+    //     val king_pos = positions(King(color))
     //     positions.keys.filter(_.color != color).map(threatens(_, king_pos)).reduceLeft(_ || _)
     // }
 
     def isInCheck(color: Color): Boolean = {
-        val king_pos = positions(King(color, 0))
+        val king_pos = positions(King(color))
 
         def withinBoard(x: Int) = x >= 0 && x <= 7
 
@@ -367,7 +371,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 }
             }
 
-            case King(_, _) => {
+            case King(_) => {
                 for(dx <- -1 to 1) {
                     for(dy <- -1 to 1 by 2) {
                         if(withinBoard(position.row + dx) && withinBoard(position.column + dy)) {
@@ -403,25 +407,13 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
         // castling
         val row = if(color == White) 0 else 7
         val color_code = if(color == White) 0 else 1
-        val king = King(color, 0)
-        val kingPos = positions(king)
-        if(kingPos.row == row && kingPos.column == 4) {
-            for(r <- 0 to 1) {
-                val rook = Rook(color, r)
-                if(positions.contains(rook) && castlingRights(color_code)(r)) {
-                    val rookPos = positions(rook)
-                    if(rookPos.row == row) {
-                        if(rookPos.column == 0 && (1 to 3).map(board(row)(_) == null).reduceLeft(_ && _)) {
-                            val move = Castling(king, rook)
-                            if( !apply(move).isInCheck(color) ) output ::= move
-                        }
-                        if(rookPos.column == 7 && (5 to 6).map(board(row)(_) == null).reduceLeft(_ && _)) {
-                            val move = Castling(king, rook)
-                            if( !apply(move).isInCheck(color) ) output ::= move
-                        }
-                    }
-                }
-            }
+        if(castlingRights(color_code)(0) && (1 to 3).map(board(row)(_) == null).reduceLeft(_ && _)) {
+            val move = Castling(Position(row, 4), Position(row, 0))
+            if( !apply(move).isInCheck(color) ) output ::= move
+        }
+        if(castlingRights(color_code)(1) && (5 to 6).map(board(row)(_) == null).reduceLeft(_ && _)) {
+            val move = Castling(Position(row, 4), Position(row, 7))
+            if( !apply(move).isInCheck(color) ) output ::= move
         }
 
         output
@@ -451,7 +443,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                         case Knight(_, _) => "n"
                         case Bishop(_, _) => "b"
                         case Queen(_, _) => "q"
-                        case King(_, _) => "k"
+                        case King(_) => "k"
                     }
                     if(piece.color == White) representation += code.capitalize
                     else representation += code
@@ -541,8 +533,8 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
         case Bishop(Black, _) => 7
         case Queen(White, _) => 8
         case Queen(Black, _) => 9
-        case King(White, _) => 10
-        case King(Black, _) => 11
+        case King(White) => 10
+        case King(Black) => 11
         case _ => 11
     }
 
@@ -613,8 +605,8 @@ object ChessState {
     	positions = addPiece(board, positions, Queen(White, 0), Position(0, 3))
     	positions = addPiece(board, positions, Queen(Black, 0), Position(7, 3))
 
-    	positions = addPiece(board, positions, King(White, 0), Position(0, 4))
-    	positions = addPiece(board, positions, King(Black, 0), Position(7, 4))
+    	positions = addPiece(board, positions, King(White), Position(0, 4))
+    	positions = addPiece(board, positions, King(Black), Position(7, 4))
 
     	positions = addPiece(board, positions, Bishop(White, 1), Position(0, 5))
     	positions = addPiece(board, positions, Bishop(Black, 1), Position(7, 5))
