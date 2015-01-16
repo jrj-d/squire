@@ -4,7 +4,6 @@
 // + fifty-move rule not implemented
 //
 // todo:
-// implement en passant
 // implement xboard client
 
 
@@ -39,9 +38,10 @@ sealed abstract class ChessMove
 case class RegularChessMove(val origin: Position, val destination: Position) extends ChessMove
 case class Castling(val kingPos: Position, val rookPos: Position) extends ChessMove
 case class Promotion(val origin: Position, val promoted: Char, val destination: Position) extends ChessMove
+case class EnPassant(val origin: Position, val destination: Position) extends ChessMove
 
 
-class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positions: Map[ChessPiece, Position], val castlingRights: Array[Array[Boolean]]) extends GameState[ChessMove]{
+class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positions: Map[ChessPiece, Position], val castlingRights: Array[Array[Boolean]], val enPassantPosition: Option[Position]) extends GameState[ChessMove]{
 
     def getPiece(pos: Position) = board(pos.row)(pos.column)
 
@@ -69,11 +69,11 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 val color = piece.color
                 val color_code = if(color == White) 0 else 1
                 piece match {
-                    case King(c) if c == color => {
+                    case King(_) => {
                         newCastlingRights(color_code)(0) = false
                         newCastlingRights(color_code)(1) = false
                     }
-                    case Rook(c, _) if c == color => {
+                    case Rook(_, _) => {
                         val row = if(color == White) 0 else 7
                         if(origin.row == row && origin.column == 0) newCastlingRights(color_code)(0) = false
                         if(origin.row == row && origin.column == 7) newCastlingRights(color_code)(1) = false
@@ -81,7 +81,16 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     case _ => ()
                 }
 
-                new ChessState(turn + 1, newBoard, positions + (piece -> destination) - deletedPiece, newCastlingRights)
+                // handle en passant marking
+                val newEnPassantPosition = piece match {
+                    case _: Pawn => if(abs(origin.row - destination.row) == 2) {
+                        val dir = if(color == White) 1 else -1
+                        Some(Position(destination.row - dir, destination.column))
+                    } else None
+                    case _ => None
+                }
+
+                new ChessState(turn + 1, newBoard, positions + (piece -> destination) - deletedPiece, newCastlingRights, newEnPassantPosition)
             }
 
             case Castling(kingPos, rookPos) => {
@@ -101,7 +110,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     newBoard(row)(2) = king
                     newCastlingRights(color_code)(0) = false
                     newCastlingRights(color_code)(1) = false
-                    new ChessState(turn + 1, newBoard, positions + (rook -> Position(row, 3)) + (king -> Position(row, 2)), newCastlingRights)
+                    new ChessState(turn + 1, newBoard, positions + (rook -> Position(row, 3)) + (king -> Position(row, 2)), newCastlingRights, None)
                 } else if(rookPos.column == 7) {
                     newBoard(row)(4) = null
                     newBoard(row)(7) = null
@@ -110,9 +119,10 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     newBoard(row)(6) = king
                     newCastlingRights(color_code)(0) = false
                     newCastlingRights(color_code)(1) = false
-                    new ChessState(turn + 1, newBoard, positions + (rook -> Position(row, 5)) + (king -> Position(row, 6)), newCastlingRights)
+                    new ChessState(turn + 1, newBoard, positions + (rook -> Position(row, 5)) + (king -> Position(row, 6)), newCastlingRights, None)
                 } else throw new IllegalArgumentException
             }
+
             case Promotion(origin, promoted, destination) => {
                 val pawn = getPiece(origin)
                 pawn match {
@@ -129,7 +139,17 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     case _ => Queen(pawn.color, turn)
                 }
                 newBoard(destination.row)(destination.column) = newPiece
-                new ChessState(turn + 1, newBoard, positions + (newPiece -> destination) - pawn - deletedPiece, newCastlingRights)
+                new ChessState(turn + 1, newBoard, positions + (newPiece -> destination) - pawn - deletedPiece, newCastlingRights, None)
+            }
+
+            case EnPassant(origin, destination) => {
+                val piece = getPiece(origin)
+                newBoard(origin.row)(origin.column) = null
+                val deletedPiece = getPiece(Position(origin.row, destination.column))
+                if(deletedPiece == null) throw new IllegalArgumentException("en passant: there is no piece deleted in this en passant move")
+                newBoard(destination.row)(destination.column) = piece
+                newBoard(origin.row)(destination.column) = null
+                new ChessState(turn + 1, newBoard, positions + (piece -> destination) - deletedPiece, newCastlingRights, None)
             }
         }
     }
@@ -412,6 +432,25 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
             moves ::= Castling(Position(row, 4), Position(row, 7))
         }
 
+        // en passant
+        enPassantPosition match {
+            case Some(Position(row, col)) => {
+                val dir = if(color == White) 1 else -1
+                for(shift <- -1 to 1 by 2) {
+                    if(col + shift >= 0 && col + shift <= 7) {
+                        val piece = board(row - dir)(col + shift)
+                        piece match {
+                            case Pawn(c, _) if c == color => {
+                                moves ::= EnPassant(Position(row - dir, col + shift), Position(row, col))
+                            }
+                            case _ => ()
+                        }
+                    }
+                }
+            }
+            case None => ()
+        }
+
         moves.filter(!apply(_).isInCheck(color))
     }
 
@@ -541,6 +580,12 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 if(castlingRights(i)(j)) h = h ^ ChessState.castling_hash(i)(j)
             }
         }
+        enPassantPosition match {
+            case Some(Position(row, col)) => {
+                h = h ^ ChessState.enpassant_hash(if(row == 2) 0 else 1)(col)
+            }
+            case None => ()
+        }
         for(i <- 0 until 8) {
             for(j <- 0 until 8) {
                 val piece = board(i)(j)
@@ -570,6 +615,12 @@ object ChessState {
     for(i <- 0 until 2) {
         for(j <- 0 until 2) {
             castling_hash(i)(j) = scala.util.Random.nextInt
+        }
+    }
+    val enpassant_hash = Array.ofDim[Int](2, 8)
+    for(i <- 0 until 2) {
+        for(j <- 0 until 8) {
+            enpassant_hash(i)(j) = scala.util.Random.nextInt
         }
     }
     val turn_hash = scala.util.Random.nextInt
@@ -613,6 +664,6 @@ object ChessState {
     	positions = addPiece(board, positions, Rook(White, 1), Position(0, 7))
     	positions = addPiece(board, positions, Rook(Black, 1), Position(7, 7))
 
-    	new ChessState(0, board, positions, castlingRights)
+    	new ChessState(0, board, positions, castlingRights, None)
 	}
 }
