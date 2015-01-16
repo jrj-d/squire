@@ -95,7 +95,7 @@ class ChessHumanPlayer extends Agent[ChessMove] {
 							val Some(dest) = destOption
 							val piece = chessState.board(src.row)(src.column)
 							if(piece != null) {
-								val move = RegularChessMove(piece, dest)
+								val move = RegularChessMove(src, dest)
 								if(moves.contains(move)) return move
 								else forbidden("not found among valid moves")
 							} else forbidden("did not find source piece")
