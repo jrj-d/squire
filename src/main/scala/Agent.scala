@@ -113,14 +113,12 @@ class ChessHumanPlayer extends Agent[ChessMove] {
 							piece match {
 								case Pawn(c, n) => {
 									val move = promoted match {
-										case "Rook" => Promotion(src, Rook(color, chessState.turn + 3), dest)
-										case "Knight" => Promotion(src, Knight(color, chessState.turn + 3), dest)
-										case "Bishop" => Promotion(src, Bishop(color, chessState.turn + 3), dest)
-										case "Queen" => Promotion(src, Queen(color, chessState.turn + 3), dest)
-										case _ => null
+										case "r" => Promotion(src, 'r', dest)
+										case "n" => Promotion(src, 'n', dest)
+										case "b" => Promotion(src, 'b', dest)
+										case _ => Promotion(src, 'q', dest)
 									}
-									if(move == null) wrongFormat("wrong coding for promoted piece")
-									else if(moves.contains(move)) return move
+									if(moves.contains(move)) return move
 									else forbidden("not found among valid moves")
 								}
 								case _ => wrongFormat("did not find source piece or source piece not a pawn")

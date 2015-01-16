@@ -4,7 +4,6 @@
 // + fifty-move rule not implemented
 //
 // todo:
-// transform promoted piece in Promotion to something without id
 // implement en passant
 // implement xboard client
 
@@ -39,7 +38,7 @@ case class Position(val row: Int, val column: Int)
 sealed abstract class ChessMove
 case class RegularChessMove(val origin: Position, val destination: Position) extends ChessMove
 case class Castling(val kingPos: Position, val rookPos: Position) extends ChessMove
-case class Promotion(val origin: Position, val promoted: ChessPiece, val destination: Position) extends ChessMove
+case class Promotion(val origin: Position, val promoted: Char, val destination: Position) extends ChessMove
 
 
 class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positions: Map[ChessPiece, Position], val castlingRights: Array[Array[Boolean]]) extends GameState[ChessMove]{
@@ -123,8 +122,14 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 newBoard(origin.row)(origin.column) = null
                 var deletedPiece = board(destination.row)(destination.column)
                 deletedPiece = if(deletedPiece != null) deletedPiece else Pawn(White, -1) // fake piece to avoid if statement
-                newBoard(destination.row)(destination.column) = promoted
-                new ChessState(turn + 1, newBoard, positions + (promoted -> destination) - pawn - deletedPiece, newCastlingRights)
+                val newPiece = promoted match {
+                    case 'r' => Rook(pawn.color, turn)
+                    case 'n' => Knight(pawn.color, turn)
+                    case 'b' => Bishop(pawn.color, turn)
+                    case _ => Queen(pawn.color, turn)
+                }
+                newBoard(destination.row)(destination.column) = newPiece
+                new ChessState(turn + 1, newBoard, positions + (newPiece -> destination) - pawn - deletedPiece, newCastlingRights)
             }
         }
     }
@@ -292,10 +297,10 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     output ::= RegularChessMove(position, Position(position.row + direction, position.column))
                     if(position.row + direction == end_row) { // promotions
                         output :::= List(
-                            Promotion(position, Rook(color, turn + 3), Position(position.row + direction, position.column)),
-                            Promotion(position, Knight(color, turn + 3), Position(position.row + direction, position.column)),
-                            Promotion(position, Bishop(color, turn + 3), Position(position.row + direction, position.column)),
-                            Promotion(position, Queen(color, turn + 3), Position(position.row + direction, position.column))
+                            Promotion(position, 'r', Position(position.row + direction, position.column)),
+                            Promotion(position, 'n', Position(position.row + direction, position.column)),
+                            Promotion(position, 'b', Position(position.row + direction, position.column)),
+                            Promotion(position, 'q', Position(position.row + direction, position.column))
                         )
                     }
                 }
@@ -313,10 +318,10 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                             output ::= RegularChessMove(position, Position(position.row + direction, position.column + shift))
                             if(position.row + direction == end_row) { // promotions
                                 output :::= List(
-                                    Promotion(position, Rook(color, turn + 3), Position(position.row + direction, position.column + shift)),
-                                    Promotion(position, Knight(color, turn + 3), Position(position.row + direction, position.column + shift)),
-                                    Promotion(position, Bishop(color, turn + 3), Position(position.row + direction, position.column + shift)),
-                                    Promotion(position, Queen(color, turn + 3), Position(position.row + direction, position.column + shift))
+                                    Promotion(position, 'r', Position(position.row + direction, position.column + shift)),
+                                    Promotion(position, 'n', Position(position.row + direction, position.column + shift)),
+                                    Promotion(position, 'b', Position(position.row + direction, position.column + shift)),
+                                    Promotion(position, 'q', Position(position.row + direction, position.column + shift))
                                 )
                             }
                         }
