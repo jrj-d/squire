@@ -1,7 +1,7 @@
-package chess_buddy
+package squire
 
 
-import chess_buddy.agent.Agent
+import squire.agent.Agent
 
 
 case class Feature(val description: String, val value: Double)

@@ -18,6 +18,5 @@ resolvers ++= Seq(
 lazy val root = (project in file(".")).
 
 	settings(
-		name := "chess-buddy",
-		version := "0.1"
+		name := "squire"
 	)

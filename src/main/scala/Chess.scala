@@ -7,12 +7,12 @@
 // implement xboard client
 
 
-package chess_buddy.chess
+package squire.chess
 
 
 import scala.math.{min, max, abs}
 import scala.collection.mutable.ArrayBuffer
-import chess_buddy._
+import squire._
 
 
 object Color extends Enumeration {

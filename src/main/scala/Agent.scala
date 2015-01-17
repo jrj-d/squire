@@ -1,8 +1,8 @@
-package chess_buddy.agent
+package squire.agent
 
-import chess_buddy._
-import chess_buddy.chess._
-import chess_buddy.chess.Color._
+import squire._
+import squire.chess._
+import squire.chess.Color._
 import regression._
 
 import scala.math.{max, tanh}
