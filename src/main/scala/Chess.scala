@@ -599,7 +599,52 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
         case that: ChessState => this.hashCode == that.hashCode
         case _ => false
     }
+
+    def decodeANMove(code: String): Option[ChessMove] = code.length match {
+        case 4 => { // anything but promotion
+            val srcOption = ChessState.decodeAlgebraicNotation(code.slice(0,2))
+            val destOption = ChessState.decodeAlgebraicNotation(code.slice(2,4))
+            if(srcOption == None || destOption == None) return None
+            val src = srcOption.get
+            val dest = destOption.get
+
+            val d_row = dest.row - src.row
+            val d_col = dest.column - src.column
+            val piece = getPiece(src)
+
+            // castling
+            if((piece == King(White) || piece == King(Black)) && abs(d_col) == 2) {
+                return Some(Castling(src, Position(dest.row, if(d_col > 0) 7 else 0)))
+            }
+
+            // en passant
+            piece match {
+                case Pawn(_, _) => if(abs(d_col) > 0 && getPiece(dest) == null) return Some(EnPassant(src, dest))
+                case _ => ()
+            }
+
+            return Some(RegularChessMove(src, dest))
+        }
+        case 5 => { // promotion
+            val src = ChessState.decodeAlgebraicNotation(code.slice(0,2))
+            val dest = ChessState.decodeAlgebraicNotation(code.slice(2,4))
+            if(src != None && dest != None) Some(Promotion(src.get, code(4), dest.get))
+            else None
+        }
+        case _ => None
+    }
+
+    def encodeANMove(move: ChessMove): String = move match {
+        case RegularChessMove(src, dest) => ChessState.encodeAlgebraicNotation(src) + ChessState.encodeAlgebraicNotation(dest)
+        case Promotion(src, promoted, dest) => ChessState.encodeAlgebraicNotation(src) + ChessState.encodeAlgebraicNotation(dest) + promoted
+        case Castling(kingPos, rookPos) => if(rookPos.column > kingPos.column)
+                ChessState.encodeAlgebraicNotation(kingPos) + ChessState.encodeAlgebraicNotation(Position(kingPos.row, kingPos.column + 2))
+            else
+                ChessState.encodeAlgebraicNotation(kingPos) + ChessState.encodeAlgebraicNotation(Position(kingPos.row, kingPos.column - 2))
+        case EnPassant(src, dest) => ChessState.encodeAlgebraicNotation(src) + ChessState.encodeAlgebraicNotation(dest)
+    }
 }
+
 
 object ChessState {
 
@@ -669,12 +714,12 @@ object ChessState {
 
     val pattern = """([a-h])([1-8])""".r
 
-    def decodeAlgebraicNotation(code: String): Option[Position] = {
-        code match {
-            case pattern(col_str, row_str) => Some(Position((row_str.charAt(0) - '1'):Int, (col_str.charAt(0) - 'a'):Int))
-            case _ => None
-        }
+    def decodeAlgebraicNotation(code: String): Option[Position] = code match {
+        case pattern(col_str, row_str) => Some(Position((row_str.charAt(0) - '1'):Int, (col_str.charAt(0) - 'a'):Int))
+        case _ => None
     }
+
+    def encodeAlgebraicNotation(position: Position): String = ('a' + position.column).toChar.toString + (1 + position.row).toString
 
     def parseFen(code: String) = {
 

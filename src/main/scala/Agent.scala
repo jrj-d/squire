@@ -7,7 +7,6 @@ import regression._
 
 import scala.math.{max, tanh}
 import java.text.DecimalFormat
-import scala.collection.mutable.{Map => MuMap}
 
 
 case class TimeOutException(message: String) extends Exception(message)
@@ -264,18 +263,12 @@ trait MovesOrdering[Move] { self: MinimaxAgent[Move] =>
 	}
 }
 
-trait TranspositionTable[Move] { self: MinimaxAgent[Move] with AlphaBetaPruning[Move] =>
-
-	val table: MuMap[Int, Tuple2[Int, Double]] = MuMap()
-
-} // todo
-
 
 object Default {
 	def estimator: Regressor = {
 		var coefficients = Array(-10.0, 1, 5, 3, 3, 9, // check + # pieces
-								 -1, 1, -1, 1, -1, 1, -2, 2, // first pieces (threat + def)
-								 -1, 1, -1, 1, -1, 1, -2, 2) // second pieces (threat + def)
+								 -1, 1, -1, 1, -1, 1, -2, 1, // first pieces (threat + def)
+								 -1, 1, -1, 1, -1, 1, -2, 1) // second pieces (threat + def)
 		coefficients = coefficients ++ coefficients.map(-1 * _)
 		return new Ridge(coefficients)
 	}
