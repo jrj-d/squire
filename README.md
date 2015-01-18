@@ -35,4 +35,5 @@ call from XBoard by loading a new engine, with Squire's root folder as directory
 + Adjust evaluation function weights, or learn them
 + Implement quiescence search
 
+[![Build Status](https://travis-ci.org/jrj-d/squire.svg?branch=master)](https://travis-ci.org/jrj-d/squire)
 [![Coverage Status](https://coveralls.io/repos/jrj-d/squire/badge.svg)](https://coveralls.io/r/jrj-d/squire)
