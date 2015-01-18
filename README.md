@@ -34,3 +34,5 @@ call from XBoard by loading a new engine, with Squire's root folder as directory
 + Correct castling move for check restrictions (for now only checks if the king is in check at the end of the move)
 + Adjust evaluation function weights, or learn them
 + Implement quiescence search
+
+[![Coverage Status](https://coveralls.io/repos/jrj-d/squire/badge.svg)](https://coveralls.io/r/jrj-d/squire)
