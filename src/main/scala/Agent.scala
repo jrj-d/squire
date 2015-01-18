@@ -132,10 +132,12 @@ class ChessHumanPlayer extends Agent[ChessMove] {
 }
 
 
-class MinimaxAgent[Move](val estimator: Regressor, val maxTime: Double) extends Agent[Move] {
+class MinimaxAgent[Move](val estimator: Regressor, var maxTime: Double) extends Agent[Move] {
 
 	var nodeCounter = 0
 	var global_init_time: Long = 0
+
+	def setTimePerMove(time: Double) = {maxTime = time}
 
 	def play(state: GameState[Move]): Move = {
 		global_init_time = System.currentTimeMillis
@@ -176,7 +178,7 @@ class MinimaxAgent[Move](val estimator: Regressor, val maxTime: Double) extends 
 
 		val duration = (System.currentTimeMillis - init_time) / 60000.0
 
-		println(depth + "-ply depth, " + nodeCounter + " states evaluated in " + formatter.format(duration) + " minutes -> " + bestMove.toString)
+		println("# " + depth + "-ply depth, " + nodeCounter + " states evaluated in " + formatter.format(duration) + " minutes -> " + bestMove.toString)
 
 		return bestMove
 	}
@@ -188,7 +190,7 @@ class MinimaxAgent[Move](val estimator: Regressor, val maxTime: Double) extends 
 		state.evaluate match {
 			case Some(v) => color * v
 			case None =>
-				if(depth == 0) tanh(color * estimator(state.features.map(_.value)))
+				if(depth == 0) tanh(color * estimator(state.features.map(_.value)) / 100.0)
 				else getPossibleMoves(state)
 					.map (state.apply(_))
 					.map (-negamax(_, depth - 1, -color))
@@ -212,7 +214,8 @@ trait AlphaBetaPruning[Move] { self: MinimaxAgent[Move] =>
 		var bestMove: Option[Move] = None
 		for(move <- getPossibleMoves(state)) {
 			val currentValue = -negamax(state.apply(move), depth - 1, -1 + 2 * (state.turn % 2), Double.MinValue, -currentAlpha)
-			if(currentValue > bestValue) {
+			println("# " + currentValue + " -> " + move.toString)
+			if(currentValue >= bestValue) {
 				bestValue = currentValue
 				bestMove = Some(move)
 			}
@@ -221,8 +224,7 @@ trait AlphaBetaPruning[Move] { self: MinimaxAgent[Move] =>
 
 		val duration = (System.currentTimeMillis - init_time) / 60000.0
 
-		println(depth + "-ply depth, " + nodeCounter + " states evaluated in " + formatter.format(duration) + " minutes -> " + bestMove.get.toString)
-
+		println("# " + depth + "-ply depth, " + nodeCounter + " states evaluated in " + formatter.format(duration) + " minutes -> " + bestMove.get.toString + " (" + bestValue + ")")
 		return bestMove.get
 	}
 
@@ -231,7 +233,7 @@ trait AlphaBetaPruning[Move] { self: MinimaxAgent[Move] =>
 		state.evaluate match {
 			case Some(v) => color * v
 			case None =>
-				if(depth == 0) tanh(color * estimator(state.features.map(_.value)))
+				if(depth == 0) tanh(color * estimator(state.features.map(_.value)) / 100.0)
 				else {
 					var bestValue = Double.MinValue
 					var currentAlpha = alpha
@@ -267,8 +269,8 @@ trait MovesOrdering[Move] { self: MinimaxAgent[Move] =>
 object Default {
 	def estimator: Regressor = {
 		var coefficients = Array(-10.0, 1, 5, 3, 3, 9, // check + # pieces
-								 -1, 1, -1, 1, -1, 1, -2, 1, // first pieces (threat + def)
-								 -1, 1, -1, 1, -1, 1, -2, 1) // second pieces (threat + def)
+								 -1, 1, -1, 1, -1, 1, -2, 2, // first pieces (threat + def)
+								 -1, 1, -1, 1, -1, 1, -2, 2) // second pieces (threat + def)
 		coefficients = coefficients ++ coefficients.map(-1 * _)
 		return new Ridge(coefficients)
 	}

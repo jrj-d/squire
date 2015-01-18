@@ -3,8 +3,7 @@
 // + fifty-move rule not implemented
 //
 // todo:
-// parseFEN
-// implement xboard client
+// improve castling with check rules
 
 
 package squire.chess
