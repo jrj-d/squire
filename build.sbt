@@ -1,5 +1,3 @@
-versionWithGit
-
 libraryDependencies  ++= Seq(
             // other dependencies here
             "org.scalanlp" %% "breeze" % "0.10",
