@@ -12,8 +12,11 @@ libraryDependencies  ++= Seq(
 
 resolvers ++= Seq(
             // other resolvers here
-            "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
+            "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
+            "jgit-repo" at "http://download.eclipse.org/jgit/maven"
 )
+
+addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.6.4")
 
 lazy val root = (project in file(".")).
 	settings(
