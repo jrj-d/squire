@@ -1,4 +1,4 @@
-# squire
+# Squire
 
 Squire is an incomplete chess engine written in Scala.
 
