@@ -9,7 +9,7 @@ far in terms of features and performance, as it is more of a learning project.
 In particular, I had blinders on when I read about the immutable state paradigm in Scala, and implemented a chess
 position as an immutable object. Now looking back, it would have made much more sense to use a mutable object for performance reasons.
 
-[![Build Status](https://travis-ci.org/jrj-d/squire.svg?branch=master)](https://travis-ci.org/jrj-d/squire) [![Coverage Status](https://coveralls.io/repos/jrj-d/squire/badge.svg)](https://coveralls.io/r/jrj-d/squire)
+[![Build Status](https://travis-ci.org/jrj-d/squire.svg?branch=master)](https://travis-ci.org/jrj-d/squire) [![Coverage Status](https://coveralls.io/repos/jrj-d/squire/badge.png)](https://coveralls.io/r/jrj-d/squire)
 
 ## Engine description
 

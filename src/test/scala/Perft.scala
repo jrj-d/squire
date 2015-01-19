@@ -1,10 +1,10 @@
 package squire.chess
 
 import scala.io.Source
-import org.scalatest.FlatSpec
+import org.scalatest.FunSpec
 import Color._
 
-class Perft extends FlatSpec {
+class Perft extends FunSpec {
 
 	case class MoveCount(val leaves: Long,
 					val enPassant: Long,
@@ -65,28 +65,30 @@ class Perft extends FlatSpec {
 
 		val resMoveCount = countMoves(initState, depth)
 
-		("From " + fen + " at depth " + depth + ", the engine") should ("find " + moveCount.leaves + " leaves") in {
-			assert(resMoveCount.leaves == moveCount.leaves)
-		}
+		describe("From " + fen + " at depth " + depth + ", the engine") {
+			it("should find " + moveCount.leaves + " leaf nodes") {
+				assert(resMoveCount.leaves == moveCount.leaves)
+			}
 
-		it should ("find " + moveCount.enPassant + " en passant moves at leaf nodes") in {
-			assert(resMoveCount.enPassant == moveCount.enPassant)
-		}
+			it("should find " + moveCount.enPassant + " en passant moves at leaf nodes") {
+				assert(resMoveCount.enPassant == moveCount.enPassant)
+			}
 
-		it should ("find " + moveCount.castling + " castling moves at leaf nodes") in {
-			assert(resMoveCount.castling == moveCount.castling)
-		}
+			it("should find " + moveCount.castling + " castling moves at leaf nodes") {
+				assert(resMoveCount.castling == moveCount.castling)
+			}
 
-		it should ("find " + moveCount.promotion + " promotion moves at leaf nodes") in {
-			assert(resMoveCount.promotion == moveCount.promotion)
-		}
+			it("should find " + moveCount.promotion + " promotion moves at leaf nodes") {
+				assert(resMoveCount.promotion == moveCount.promotion)
+			}
 
-		it should ("find " + moveCount.check + " check moves at leaf nodes") in {
-			assert(resMoveCount.check == moveCount.check)
-		}
+			it("should find " + moveCount.check + " check moves at leaf nodes") {
+				assert(resMoveCount.check == moveCount.check)
+			}
 
-		it should ("find " + moveCount.checkMate + " checkmate moves at leaf nodes") in {
-			assert(resMoveCount.checkMate == moveCount.checkMate)
+			it("should find " + moveCount.checkMate + " checkmate moves at leaf nodes") {
+				assert(resMoveCount.checkMate == moveCount.checkMate)
+			}
 		}
 	}
 
