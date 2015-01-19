@@ -1,3 +1,5 @@
+scalaVersion := "2.11.5"
+
 libraryDependencies  ++= Seq(
             // other dependencies here
             "org.scalanlp" %% "breeze" % "0.10",
