@@ -9,8 +9,8 @@ package object xboard {
 	var forced = false
 	var state = ChessState()
 	val engine = new MinimaxAgent[ChessMove](Default.estimator, 1.0)
-		//with AlphaBetaPruning[ChessMove]
-		//with MovesOrdering[ChessMove]
+		with AlphaBetaPruning[ChessMove]
+		with MovesOrdering[ChessMove]
 	var time = 1
 	var otim = 1
 

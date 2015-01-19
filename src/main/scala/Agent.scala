@@ -14,6 +14,7 @@ case class TimeOutException(message: String) extends Exception(message)
 
 abstract class Agent[Move] {
     def play(state: GameState[Move]): Move
+    def setTimePerMove(time: Double): Unit = {}
 }
 
 
@@ -137,7 +138,7 @@ class MinimaxAgent[Move](val estimator: Regressor, var maxTime: Double) extends 
 	var nodeCounter = 0
 	var global_init_time: Long = 0
 
-	def setTimePerMove(time: Double) = {maxTime = time}
+	override def setTimePerMove(time: Double) = {maxTime = time}
 
 	def play(state: GameState[Move]): Move = {
 		global_init_time = System.currentTimeMillis
