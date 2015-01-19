@@ -14,11 +14,11 @@ resolvers ++= Seq(
             "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
 )
 
+instrumentSettings
+
+CoverallsPlugin.coverallsSettings
+
 lazy val root = (project in file(".")).
 	settings(
 		name := "squire"
 	)
-
-instrumentSettings
-
-CoverallsPlugin.coverallsSettings
