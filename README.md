@@ -33,6 +33,6 @@ call from XBoard by loading a new engine, with Squire's root folder as directory
 ## Todo
 
 + Start coding a test suite, which should have been done before...
-+ Correct castling move for check restrictions (for now only checks if the king is in check at the end of the move)
++ Find what is causing wrong perft count in Perft. In particular, use en passant and castling counts since it's the trickiest part of legal move generation
 + Adjust evaluation function weights, or learn them
 + Implement quiescence search

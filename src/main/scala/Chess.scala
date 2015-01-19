@@ -58,7 +58,6 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 newBoard(origin.row)(origin.column) = null
                 var deletedPiece = getPiece(destination)
                 if(deletedPiece == King(White) || deletedPiece == King(Black)) throw new IllegalArgumentException("king deleted")
-                deletedPiece = if(deletedPiece != null) deletedPiece else Pawn(White, -1) // fake piece to avoid if statement
                 newBoard(destination.row)(destination.column) = piece
 
                 // handle castling rights
@@ -77,6 +76,22 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     case _ => ()
                 }
 
+                // handle castling rights if a rook is captured
+                val opp_row = if(color == Black) 0 else 7
+                val opp_color_code = (color_code + 1) % 2
+                if(destination.row == opp_row && destination.column == 0) {
+                    deletedPiece match {
+                        case _: Rook => newCastlingRights(opp_color_code)(0) = false
+                        case _ => ()
+                    }
+                }
+                if(destination.row == opp_row && destination.column == 7) {
+                    deletedPiece match {
+                        case _: Rook => newCastlingRights(opp_color_code)(1) = false
+                        case _ => ()
+                    }
+                }
+
                 // handle en passant marking
                 val newEnPassantPosition = piece match {
                     case _: Pawn => if(abs(origin.row - destination.row) == 2) {
@@ -86,6 +101,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     case _ => None
                 }
 
+                deletedPiece = if(deletedPiece != null) deletedPiece else Pawn(White, -1) // fake piece to avoid if statement
                 new ChessState(turn + 1, newBoard, positions + (piece -> destination) - deletedPiece, newCastlingRights, newEnPassantPosition)
             }
 
@@ -127,7 +143,6 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 }
                 newBoard(origin.row)(origin.column) = null
                 var deletedPiece = board(destination.row)(destination.column)
-                deletedPiece = if(deletedPiece != null) deletedPiece else Pawn(White, -1) // fake piece to avoid if statement
                 val newPiece = promoted match {
                     case 'r' => Rook(pawn.color, turn)
                     case 'n' => Knight(pawn.color, turn)
@@ -135,6 +150,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                     case _ => Queen(pawn.color, turn)
                 }
                 newBoard(destination.row)(destination.column) = newPiece
+                deletedPiece = if(deletedPiece != null) deletedPiece else Pawn(White, -1) // fake piece to avoid if statement
                 new ChessState(turn + 1, newBoard, positions + (newPiece -> destination) - pawn - deletedPiece, newCastlingRights, None)
             }
 
