@@ -9,6 +9,8 @@ far in terms of features and performance, as it is more of a learning project.
 In particular, I had blinders on when I read about the immutable state paradigm in Scala, and implemented a chess
 position as an immutable object. Now looking back, it would have made much more sense to use a mutable object for performance reasons.
 
+[![Build Status](https://travis-ci.org/jrj-d/squire.svg?branch=master)](https://travis-ci.org/jrj-d/squire) [![Coverage Status](https://coveralls.io/repos/jrj-d/squire/badge.svg)](https://coveralls.io/r/jrj-d/squire)
+
 ## Engine description
 
 Squire consists of two parts: chess implementation and search logic.
@@ -34,6 +36,3 @@ call from XBoard by loading a new engine, with Squire's root folder as directory
 + Correct castling move for check restrictions (for now only checks if the king is in check at the end of the move)
 + Adjust evaluation function weights, or learn them
 + Implement quiescence search
-
-[![Build Status](https://travis-ci.org/jrj-d/squire.svg?branch=master)](https://travis-ci.org/jrj-d/squire)
-[![Coverage Status](https://coveralls.io/repos/jrj-d/squire/badge.svg)](https://coveralls.io/r/jrj-d/squire)
