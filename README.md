@@ -17,7 +17,8 @@ Squire consists of two parts: chess implementation and search logic.
 An interface called `GameState` allows the search logic to deal with any kind of game as long as a proper subclass of
 `GameState` implementing that game is defined.
 
-The chess implementation is rather awkward and still a lot buggy, but I'm working on writing a proper test suite.
+The chess implementation is really slow, I wanted to use case classes and other Scala stuff but I'll end up using a 0x88 bitboard implementation like everybody I guess.
+At least it's tested to some extent using perft.
 
 The search algorithm is minimax (negamax) with alpha-beta pruning and moves ordering to increase the number of cut-offs.
 The engine uses interative deepening. The evaluation function is a linear combination of features provided by the
@@ -32,7 +33,6 @@ call from XBoard by loading a new engine, with Squire's root folder as directory
 
 ## Todo
 
-+ Start coding a test suite, which should have been done before...
-+ Find what is causing wrong perft count in Perft. In particular, use en passant and castling counts since it's the trickiest part of legal move generation
++ Test search logic
 + Adjust evaluation function weights, or learn them
 + Implement quiescence search

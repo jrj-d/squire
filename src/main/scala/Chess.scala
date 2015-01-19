@@ -144,10 +144,10 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 newBoard(origin.row)(origin.column) = null
                 var deletedPiece = board(destination.row)(destination.column)
                 val newPiece = promoted match {
-                    case 'r' => Rook(pawn.color, turn)
-                    case 'n' => Knight(pawn.color, turn)
-                    case 'b' => Bishop(pawn.color, turn)
-                    case _ => Queen(pawn.color, turn)
+                    case 'r' => Rook(pawn.color, turn + 2) // just to be sure in case of perft
+                    case 'n' => Knight(pawn.color, turn + 2)
+                    case 'b' => Bishop(pawn.color, turn + 2)
+                    case _ => Queen(pawn.color, turn + 2)
                 }
                 newBoard(destination.row)(destination.column) = newPiece
                 deletedPiece = if(deletedPiece != null) deletedPiece else Pawn(White, -1) // fake piece to avoid if statement
@@ -330,7 +330,6 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                 val direction = if(color == White) 1 else -1
                 val end_row = if(color == White) 7 else 0
                 if(withinBoard(position.row + direction) && board(position.row + direction)(position.column) == null) { // normal forward move
-                    output ::= RegularChessMove(position, Position(position.row + direction, position.column))
                     if(position.row + direction == end_row) { // promotions
                         output :::= List(
                             Promotion(position, 'r', Position(position.row + direction, position.column)),
@@ -338,7 +337,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                             Promotion(position, 'b', Position(position.row + direction, position.column)),
                             Promotion(position, 'q', Position(position.row + direction, position.column))
                         )
-                    }
+                    } else output ::= RegularChessMove(position, Position(position.row + direction, position.column))
                 }
                 val init_row = if(color == White) 1 else 6
                 if(position.row == init_row) { // initial double speed forward move
@@ -351,7 +350,6 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                         if(withinBoard(position.column + shift)
                            && board(position.row + direction)(position.column + shift) != null
                            && board(position.row + direction)(position.column + shift).color != color) {
-                            output ::= RegularChessMove(position, Position(position.row + direction, position.column + shift))
                             if(position.row + direction == end_row) { // promotions
                                 output :::= List(
                                     Promotion(position, 'r', Position(position.row + direction, position.column + shift)),
@@ -359,7 +357,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
                                     Promotion(position, 'b', Position(position.row + direction, position.column + shift)),
                                     Promotion(position, 'q', Position(position.row + direction, position.column + shift))
                                 )
-                            }
+                            } else output ::= RegularChessMove(position, Position(position.row + direction, position.column + shift))
                         }
                     }
                 }
