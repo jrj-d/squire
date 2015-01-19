@@ -1,9 +1,6 @@
 // current limitations:
 // + three-fold repetion not implemented
 // + fifty-move rule not implemented
-//
-// todo:
-// improve castling with check rules
 
 
 package squire.chess
@@ -210,17 +207,16 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
     //     positions.keys.filter(_.color != color).map(threatens(_, king_pos)).reduceLeft(_ || _)
     // }
 
-    def isInCheck(color: Color): Boolean = {
-        val king_pos = positions(King(color))
+    def isThreatened(position: Position, color: Color): Boolean = {
 
         def withinBoard(x: Int) = x >= 0 && x <= 7
 
         // pawns
         val dir = if(color == White) 1 else -1
-        if(withinBoard(king_pos.row + dir)) {
+        if(withinBoard(position.row + dir)) {
             for(dx <- -1 to 1 by 2) {
-                if(withinBoard(king_pos.column + dx)) {
-                    val piece = board(king_pos.row + dir)(king_pos.column + dx)
+                if(withinBoard(position.column + dx)) {
+                    val piece = board(position.row + dir)(position.column + dx)
                     piece match {
                         case Pawn(c, _) => if(c != color) return true
                         case _ => ()
@@ -234,8 +230,8 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
             val abs_dy = 3 - abs(dx)
             for(dir <- -1 to 1 by 2) {
                 val dy = dir * abs_dy
-                if(withinBoard(king_pos.row + dx) && withinBoard(king_pos.column + dy)) {
-                    val piece = board(king_pos.row + dx)(king_pos.column + dy)
+                if(withinBoard(position.row + dx) && withinBoard(position.column + dy)) {
+                    val piece = board(position.row + dx)(position.column + dy)
                     if(piece != null) {
                         piece match {
                             case Knight(c, _) => if(c != color) return true
@@ -249,7 +245,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
         // the rest
         def moveInDirection(dx: Int, dy: Int) = {
             var m = 1
-            val Position(x, y) = king_pos
+            val Position(x, y) = position
             while(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy) == null) {
                 m += 1
             }
@@ -283,6 +279,11 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
         }
 
         return false
+    }
+
+    def isInCheck(color: Color) = {
+        val king_pos = positions(King(color))
+        isThreatened(king_pos, color)
     }
 
     def listMovesOf(piece: ChessPiece): List[ChessMove] = {
@@ -425,10 +426,14 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
         val row = if(color == White) 0 else 7
         val color_code = if(color == White) 0 else 1
         if(castlingRights(color_code)(0) && (1 to 3).map(board(row)(_) == null).reduceLeft(_ && _)) {
-            moves ::= Castling(Position(row, 4), Position(row, 0))
+            if(!isInCheck(color) && !isThreatened(Position(row, 3), color)) {
+                moves ::= Castling(Position(row, 4), Position(row, 0))
+            }
         }
         if(castlingRights(color_code)(1) && (5 to 6).map(board(row)(_) == null).reduceLeft(_ && _)) {
-            moves ::= Castling(Position(row, 4), Position(row, 7))
+            if(!isInCheck(color) && !isThreatened(Position(row, 5), color)) {
+                moves ::= Castling(Position(row, 4), Position(row, 7))
+            }
         }
 
         // en passant
