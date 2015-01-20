@@ -37,7 +37,7 @@ case class Promotion(val origin: Position, val promoted: Char, val destination: 
 case class EnPassant(val origin: Position, val destination: Position) extends ChessMove
 
 
-class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positions: Map[ChessPiece, Position], val castlingRights: Array[Array[Boolean]], val enPassantPosition: Option[Position]) extends GameState[ChessMove]{
+class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positions: Map[ChessPiece, Position], val castlingRights: Array[Array[Boolean]], val enPassantPosition: Option[Position]) extends GameState[ChessMove] {
 
     def getPiece(pos: Position) = board(pos.row)(pos.column)
 
@@ -216,12 +216,6 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
             case King(_) => (abs(dx) <= 1 && abs(dy) <= 1)
     	}
     }
-
-    // old version of isInCheck using threatens is 50% slower
-    // def isInCheck(color: Color) = {
-    //     val king_pos = positions(King(color))
-    //     positions.keys.filter(_.color != color).map(threatens(_, king_pos)).reduceLeft(_ || _)
-    // }
 
     def isThreatened(position: Position, color: Color): Boolean = {
 

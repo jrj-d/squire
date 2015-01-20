@@ -4,26 +4,26 @@ import scala.io.Source
 import org.scalatest.FunSpec
 import Color._
 
-class Perft extends FunSpec {
+case class MoveCount(val leaves: Long,
+					 val enPassant: Long,
+					 val castling: Long,
+					 val promotion: Long,
+					 val check: Long,
+					 val checkMate: Long) {
 
-	case class MoveCount(val leaves: Long,
-					val enPassant: Long,
-					val castling: Long,
-					val promotion: Long,
-					val check: Long,
-					val checkMate: Long) {
+	def this() = this(0, 0, 0, 0, 0, 0)
 
-		def this() = this(0, 0, 0, 0, 0, 0)
+	def this(l: Array[Long]) = this(l(0), l(1), l(2), l(3), l(4), l(5))
 
-		def this(l: Array[Long]) = this(l(0), l(1), l(2), l(3), l(4), l(5))
+	def + (c: MoveCount) = new MoveCount(this.leaves + c.leaves,
+										 this.enPassant + c.enPassant,
+										 this.castling + c.castling,
+										 this.promotion + c.promotion,
+										 this.check + c.check,
+										 this.checkMate + c.checkMate)
+}
 
-		def + (c: MoveCount) = new MoveCount(this.leaves + c.leaves,
-											 this.enPassant + c.enPassant,
-											 this.castling + c.castling,
-											 this.promotion + c.promotion,
-											 this.check + c.check,
-											 this.checkMate + c.checkMate)
-	}
+trait PerftBehaviors { this: FunSpec =>
 
 	// count the number of (path, en passant, castling)
 	def countMoves(state: ChessState, depth: Int): MoveCount = depth match {
@@ -54,6 +54,38 @@ class Perft extends FunSpec {
 		}
 	}
 
+	def perftTestedEngine(state: ChessState, depth: Int, goal: MoveCount) {
+
+		val result = countMoves(state, depth)
+
+		it("should find " + goal.leaves + " leaf nodes") {
+			assert(result.leaves == goal.leaves)
+		}
+
+		it("should find " + goal.enPassant + " en passant moves at leaf nodes") {
+			assert(result.enPassant == goal.enPassant)
+		}
+
+		it("should find " + goal.castling + " castling moves at leaf nodes") {
+			assert(result.castling == goal.castling)
+		}
+
+		it("should find " + goal.promotion + " promotion moves at leaf nodes") {
+			assert(result.promotion == goal.promotion)
+		}
+
+		it("should find " + goal.check + " check moves at leaf nodes") {
+			assert(result.check == goal.check)
+		}
+
+		it("should find " + goal.checkMate + " checkmate moves at leaf nodes") {
+			assert(result.checkMate == goal.checkMate)
+		}
+	}
+}
+
+class Perft extends FunSpec with PerftBehaviors {
+
 	val perfts = Source.fromURL(getClass.getResource("/perfts.fen"))
 
 	for(perft <- perfts.getLines if !perft.startsWith("#")) {
@@ -62,33 +94,19 @@ class Perft extends FunSpec {
 		val depth = words(6).toInt
 		val moveCount = new MoveCount(words.slice(7, 13).map(_.toLong))
 		val initState = ChessState.parseFen(fen)
-
-		val resMoveCount = countMoves(initState, depth)
+		val alternateState = new ChessState(initState.turn, initState.board, initState.positions, initState.castlingRights, initState.enPassantPosition) {
+			override def isInCheck(color: Color) = {
+		        val king_pos = positions(King(color))
+		        positions.keys.filter(_.color != color).map(threatens(_, king_pos)).reduceLeft(_ || _)
+		    }
+		}
 
 		describe("From " + fen + " at depth " + depth + ", the engine") {
-			it("should find " + moveCount.leaves + " leaf nodes") {
-				assert(resMoveCount.leaves == moveCount.leaves)
-			}
+			it should behave like perftTestedEngine(initState, depth, moveCount)
+		}
 
-			it("should find " + moveCount.enPassant + " en passant moves at leaf nodes") {
-				assert(resMoveCount.enPassant == moveCount.enPassant)
-			}
-
-			it("should find " + moveCount.castling + " castling moves at leaf nodes") {
-				assert(resMoveCount.castling == moveCount.castling)
-			}
-
-			it("should find " + moveCount.promotion + " promotion moves at leaf nodes") {
-				assert(resMoveCount.promotion == moveCount.promotion)
-			}
-
-			it("should find " + moveCount.check + " check moves at leaf nodes") {
-				assert(resMoveCount.check == moveCount.check)
-			}
-
-			it("should find " + moveCount.checkMate + " checkmate moves at leaf nodes") {
-				assert(resMoveCount.checkMate == moveCount.checkMate)
-			}
+		describe("From " + fen + " at depth " + depth + ", the alternate engine using method threatens()") {
+			it should behave like perftTestedEngine(alternateState, depth, moveCount)
 		}
 	}
 
