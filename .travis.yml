@@ -5,3 +5,7 @@ scala:
 # - sbt clean coverage test
 # - sbt coveralls
 script: sbt coveralls
+notifications:
+  email:
+    on_success: always
+    on_failure: always
