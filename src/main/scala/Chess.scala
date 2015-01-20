@@ -693,42 +693,7 @@ object ChessState {
     	positions + (piece -> pos)
     }
 
-	def apply() = {
-        val castlingRights = Array.fill[Boolean](2, 2)(true)
-		val board = Array.ofDim[ChessPiece](8, 8)
-    	var positions: Map[ChessPiece, Position] = Map()
-
-    	for(i <- 0 to 7) {
-    		positions = addPiece(board, positions, Pawn(White, i), Position(1, i))
-    		positions = addPiece(board, positions, Pawn(Black, i), Position(6, i))
-    	}
-
-    	positions = addPiece(board, positions, Rook(White, 0), Position(0, 0))
-    	positions = addPiece(board, positions, Rook(Black, 0), Position(7, 0))
-
-    	positions = addPiece(board, positions, Knight(White, 0), Position(0, 1))
-    	positions = addPiece(board, positions, Knight(Black, 0), Position(7, 1))
-
-    	positions = addPiece(board, positions, Bishop(White, 0), Position(0, 2))
-    	positions = addPiece(board, positions, Bishop(Black, 0), Position(7, 2))
-
-    	positions = addPiece(board, positions, Queen(White, 0), Position(0, 3))
-    	positions = addPiece(board, positions, Queen(Black, 0), Position(7, 3))
-
-    	positions = addPiece(board, positions, King(White), Position(0, 4))
-    	positions = addPiece(board, positions, King(Black), Position(7, 4))
-
-    	positions = addPiece(board, positions, Bishop(White, 1), Position(0, 5))
-    	positions = addPiece(board, positions, Bishop(Black, 1), Position(7, 5))
-
-    	positions = addPiece(board, positions, Knight(White, 1), Position(0, 6))
-    	positions = addPiece(board, positions, Knight(Black, 1), Position(7, 6))
-
-    	positions = addPiece(board, positions, Rook(White, 1), Position(0, 7))
-    	positions = addPiece(board, positions, Rook(Black, 1), Position(7, 7))
-
-    	new ChessState(0, board, positions, castlingRights, None)
-	}
+	def apply() = parseFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 
     val pattern = """([a-h])([1-8])""".r
 
