@@ -3,19 +3,17 @@
 // + fifty-move rule not implemented
 
 
-package squire.chess
+package old
 
-
-import scala.math.{min, max, abs}
 import scala.collection.mutable.ArrayBuffer
-import squire._
+import scala.math.abs
 
 
 object Color extends Enumeration {
     type Color = Value
     val Black, White = Value
 }
-import Color._
+import old.Color._
 
 
 sealed abstract class ChessPiece(val color: Color)

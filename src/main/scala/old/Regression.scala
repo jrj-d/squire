@@ -1,7 +1,6 @@
-package regression
+package old
 
-
-import breeze.linalg.{DenseVector, DenseMatrix}
+import breeze.linalg.{DenseMatrix, DenseVector}
 
 
 case class UntrainedException(message: String) extends Exception(message)

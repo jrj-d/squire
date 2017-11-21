@@ -10,7 +10,11 @@ libraryDependencies  ++= Seq(
             // native libraries are not included by default. add this if you want them (as of 0.7)
             // native libraries greatly improve performance, but increase jar sizes.
             "org.scalanlp" %% "breeze-natives" % "0.13.2",
-            "org.scalatest" % "scalatest_2.12" % "3.0.4" % "test"
+            "org.scalatest" % "scalatest_2.12" % "3.0.4" % "test",
+            "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
+            "org.typelevel" %% "cats-core" % "1.0.0-RC1"
+
+
 )
 
 resolvers ++= Seq(

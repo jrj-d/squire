@@ -1,12 +1,10 @@
-package squire.agent
+package old
 
-import squire._
-import squire.chess._
-import squire.chess.Color._
-import regression._
+import java.text.DecimalFormat
+
+import old.Color._
 
 import scala.math.{max, tanh}
-import java.text.DecimalFormat
 
 
 case class TimeOutException(message: String) extends Exception(message)

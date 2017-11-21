@@ -1,9 +1,6 @@
-package squire
 
-import squire.chess.{ChessState, ChessMove}
-import squire.agent.{MinimaxAgent, AlphaBetaPruning, MovesOrdering, Default}
 
-package object xboard {
+package object old {
 
 	var continue = true
 	var forced = false

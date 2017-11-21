@@ -1,5 +1,7 @@
 package squire
 
+import old.ChessState
+
 package object debug {
 
 	import chess._

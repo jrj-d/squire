@@ -1,7 +1,4 @@
-package squire
-
-
-import squire.agent.Agent
+package old
 
 
 case class Feature(val description: String, val value: Double)
