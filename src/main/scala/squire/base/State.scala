@@ -17,7 +17,3 @@ trait State[S <: State[S]] { self: S =>
   def currentPlayer: Int
 
 }
-
-object State {
-  implicit def apply[S: State]: State[S] = implicitly[State[S]]
-}

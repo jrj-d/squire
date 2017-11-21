@@ -1,7 +1,8 @@
 package squire.agents.minimax
 
-trait Score extends Ordered[Score] {
-  override def compare(that: Score): Double = (this, that) match {
+sealed trait Score extends Ordered[Score] {
+
+  override def compare(that: Score): Int = (this, that) match {
     case (Result(0), Heuristic(thatValue)) => -Score.sign(thatValue)
     case (Heuristic(thisValue), Result(0)) => Score.sign(thisValue)
     case (Result(thisValue), Heuristic(_)) => Score.sign(thisValue)
@@ -14,6 +15,7 @@ trait Score extends Ordered[Score] {
     case Result(v) => Result(-v)
     case Heuristic(v) => Heuristic(-v)
   }
+
 }
 
 case class Heuristic(value: Double) extends Score
@@ -21,9 +23,11 @@ case class Heuristic(value: Double) extends Score
 case class Result(value: Double) extends Score
 
 object Score {
+
   def sign(d: Double): Int = d match {
     case 0 => 0
     case v if v < 0 => -1
     case _ => 1
   }
+  
 }
