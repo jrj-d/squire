@@ -6,9 +6,9 @@ import com.typesafe.scalalogging.Logger
 import squire.base.{Finished, Playing, State}
 import squire.base.Agent
 
-class MinimaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends Agent[S] {
+class NegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends Agent[S] {
 
-  val logger = Logger("MinimaxAgent")
+  val logger = Logger("NegamaxAgent")
   val formatter = new DecimalFormat("#.##")
 
   def play(state: S): S#Move = findBestMove(state, maxDepth)

@@ -29,5 +29,5 @@ object Score {
     case v if v < 0 => -1
     case _ => 1
   }
-  
+
 }
