@@ -72,9 +72,9 @@ case class ChessState(
     // The expected behavior is: throw an exception if the move is not valid.
     // That's why there are some unsafe pieces of code.
 
-    val newBoard = toMutableSeq(board.map(toMutableSeq))
-    val newCastlingRights: MutableMap[Color, MutableIndexedSeq[Boolean]] = toMutableMap(castlingRights.mapValues(toMutableSeq))
-    val newPositions = toMutableMap(positions)
+    val newBoard = MutableIndexedSeq(board.map(row => MutableIndexedSeq(row:_*)):_*)
+    val newCastlingRights = MutableMap(castlingRights.mapValues(row => MutableIndexedSeq(row:_*)).toSeq:_*)
+    val newPositions = MutableMap(positions.toSeq:_*)
     var newEnPassantPosition: Option[Position] = None
 
     move match {
@@ -209,9 +209,9 @@ case class ChessState(
 
     ChessState(
       (currentPlayer + 1) % 2,
-      toImmutableSeq(newBoard.map(toImmutableSeq)),
-      toImmutableMap(newPositions.toMap),
-      toImmutableMap(newCastlingRights.mapValues(toImmutableSeq).toMap),
+      IndexedSeq(newBoard.map(row => IndexedSeq(row:_*)):_*),
+      ImmutableMap(newPositions.toSeq:_*),
+      ImmutableMap(newCastlingRights.mapValues(row => IndexedSeq(row:_*)).toSeq:_*),
       newEnPassantPosition
     )
 
@@ -647,9 +647,9 @@ object ChessState {
 
     ChessState(
       turn % 2,
-      toImmutableSeq(board.map(toImmutableSeq)),
-      toImmutableMap(positions.toMap),
-      toImmutableMap(castlingRights.mapValues(toImmutableSeq).toMap),
+      IndexedSeq(board.map(row => IndexedSeq(row:_*)):_*),
+      ImmutableMap(positions.toSeq:_*),
+      ImmutableMap(castlingRights.mapValues(row => IndexedSeq(row:_*)).toSeq:_*),
       enPassantPosition
     )
   }
