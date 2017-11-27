@@ -1,8 +1,9 @@
 package old
 
-import scala.io.Source
-import org.scalatest.FunSpec
 import old.Color._
+import org.scalatest.FunSpec
+
+import scala.io.Source
 
 case class MoveCount(val leaves: Long,
 					 val enPassant: Long,
