@@ -1,11 +1,13 @@
 package squire.chess
 
-import old.{Pawn, Rook}
+import squire.base.{Evaluation, Finished, Playing, State}
+import squire.utils._
 
-import scala.collection.mutable.{IndexedSeq => MutableIndexedSeq}
-import scala.collection.mutable.{Map => MutableMap}
-import scala.specialized
-import squire.base.State
+import scala.collection.immutable.{Map => ImmutableMap}
+import scala.collection.mutable
+import scala.collection.mutable.{IndexedSeq => MutableIndexedSeq, Map => MutableMap}
+import scala.math.abs
+import scala.util.matching.Regex
 
 
 sealed abstract class Color(val id: Int) {
@@ -16,6 +18,13 @@ sealed abstract class Color(val id: Int) {
 }
 case object White extends Color(0)
 case object Black extends Color(1)
+object Color {
+  def fromPlayer(i: Int): Color = i match {
+    case 0 => White
+    case 1 => Black
+    case _ => throw new IllegalArgumentException(s"Unknown chess player numbered $i (should be 0 or 1)")
+  }
+}
 
 
 sealed trait PieceType
@@ -43,17 +52,12 @@ case class EnPassant(origin: Position, destination: Position) extends ChessMove
 case class ChessState(
                        currentPlayer: Int,
                        board: IndexedSeq[IndexedSeq[Option[ChessPiece]]],
-                       positions: Map[ChessPiece, Position],
-                       castlingRights: Map[Color, IndexedSeq[Boolean]],
+                       positions: ImmutableMap[ChessPiece, Position],
+                       castlingRights: ImmutableMap[Color, IndexedSeq[Boolean]],
                        enPassantPosition: Option[Position]
                      ) extends State[ChessState] {
 
   type Move = ChessMove
-
-  def toMutableSeq[T](seq: IndexedSeq[T]): MutableIndexedSeq[T] = MutableIndexedSeq[T](seq:_*)
-  def toImmutableSeq[T](seq: MutableIndexedSeq[T]): IndexedSeq[T] = IndexedSeq[T](seq:_*)
-  def toMutableMap[K, T](seq: Map[K, T]): MutableMap[K, T] = MutableMap[K, T](seq.toSeq:_*)
-  def toImmutableMap[K, T](seq: MutableMap[K, T]): Map[K, T] = Map[K, T](seq.toSeq:_*)
 
   private def getPiece(pos: Position): Option[ChessPiece] = board(pos.row)(pos.column)
 
@@ -69,18 +73,27 @@ case class ChessState(
     // That's why there are some unsafe pieces of code.
 
     val newBoard = toMutableSeq(board.map(toMutableSeq))
-    val newCastlingRights = toMutableMap(castlingRights.mapValues(toMutableSeq))
+    val newCastlingRights: MutableMap[Color, MutableIndexedSeq[Boolean]] = toMutableMap(castlingRights.mapValues(toMutableSeq))
     val newPositions = toMutableMap(positions)
+    var newEnPassantPosition: Option[Position] = None
 
     move match {
 
       case RegularChessMove(origin, destination) => {
 
         val piece = getPiece(origin).get // fail if no moved piece
-        newBoard(origin.row)(origin.column) = None
+
+        // remove deleted piece if needed
         val deletedPieceOption = getPiece(destination)
-        if(deletedPieceOption.exists(_.pieceType == King)) throw new IllegalArgumentException("cannot capture king")
+        deletedPieceOption.foreach { deletedPiece =>
+          if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
+          newPositions -= deletedPiece
+        }
+
+        // move piece
         newBoard(destination.row)(destination.column) = Some(piece)
+        newBoard(origin.row)(origin.column) = None
+        newPositions(piece) = destination
 
         // handle castling rights
         piece.pieceType match {
@@ -94,135 +107,159 @@ case class ChessState(
 
         // handle castling rights if a rook is captured
         deletedPieceOption.foreach { deletedPiece =>
-          if (deletedPiece.pieceType == Rook) {
+          if (deletedPiece.pieceType == Rook & deletedPiece.id <= 1) {
             newCastlingRights(deletedPiece.color)(deletedPiece.id) = false
           }
         }
 
-        //TODO: work from here
-
         // handle en passant marking
-        val newEnPassantPosition = piece match {
-          case _: Pawn => if(abs(origin.row - destination.row) == 2) {
-            val dir = if(color == White) 1 else -1
-            Some(Position(destination.row - dir, destination.column))
-          } else None
+        newEnPassantPosition = piece.pieceType match {
+          case Pawn =>
+            if(abs(origin.row - destination.row) == 2) {
+              val dir = if(piece.color == White) 1 else -1
+              Some(Position(destination.row - dir, destination.column))
+            } else None
           case _ => None
         }
 
-        deletedPieceOption = if(deletedPieceOption != null) deletedPieceOption else Pawn(White, -1) // fake piece to avoid if statement
-        new ChessState((currentPlayer + 1) % 2, newBoard, positions + (piece -> destination) - deletedPieceOption, newCastlingRights, newEnPassantPosition)
       }
 
       case Castling(kingPos, rookPos) => {
-        val king = getPiece(kingPos)
-        val rook = getPiece(rookPos)
-        if(king == null)  throw new IllegalArgumentException("castling: king is not where you said")
-        if(rook == null)  throw new IllegalArgumentException("castling: there is no rook where you said")
+
+        val kingOption = getPiece(kingPos)
+        val rookOption = getPiece(rookPos)
+        if(!kingOption.exists(_.pieceType == King)) throw new IllegalArgumentException("castling: king is not where indicated")
+        if(!rookOption.exists(_.pieceType == Rook)) throw new IllegalArgumentException("castling: there is no rook where indicated")
+        val king = kingOption.get
+        val rook = rookOption.get
+
         val row = if(king.color == White) 0 else 7
-        val color_code = if(king.color == White) 0 else 1
+
         if(kingPos.row != row || kingPos.column != 4) throw new IllegalArgumentException("castling: king not in the right place")
         if(rookPos.row != row) throw new IllegalArgumentException("castling: rook not in the right row")
+
         if(rookPos.column == 0) {
-          newBoard(row)(4) = null
-          newBoard(row)(0) = null
-          if(board(row)(3) != null || board(row)(2) != null) throw new IllegalArgumentException("castling: some pieces between rook and king")
-          newBoard(row)(3) = rook
-          newBoard(row)(2) = king
-          newCastlingRights(color_code)(0) = false
-          newCastlingRights(color_code)(1) = false
-          new ChessState(turn + 1, newBoard, positions + (rook -> Position(row, 3)) + (king -> Position(row, 2)), newCastlingRights, None)
+
+          newBoard(row)(4) = None
+          newBoard(row)(0) = None
+
+          if(board(row)(3).isDefined || board(row)(2).isDefined) throw new IllegalArgumentException("castling: some pieces between rook and king")
+
+          newBoard(row)(3) = Some(rook)
+          newBoard(row)(2) = Some(king)
+          newPositions(rook) = Position(row, 3)
+          newPositions(king) = Position(row, 2)
+
+          newCastlingRights(king.color)(0) = false
+          newCastlingRights(king.color)(1) = false
+
         } else if(rookPos.column == 7) {
-          newBoard(row)(4) = null
-          newBoard(row)(7) = null
-          if(board(row)(5) != null || board(row)(6) != null) throw new IllegalArgumentException("castling: some pieces between rook and king")
-          newBoard(row)(5) = rook
-          newBoard(row)(6) = king
-          newCastlingRights(color_code)(0) = false
-          newCastlingRights(color_code)(1) = false
-          new ChessState(turn + 1, newBoard, positions + (rook -> Position(row, 5)) + (king -> Position(row, 6)), newCastlingRights, None)
-        } else throw new IllegalArgumentException
+
+          newBoard(row)(4) = None
+          newBoard(row)(7) = None
+
+          if(board(row)(5).isDefined || board(row)(6).isDefined) throw new IllegalArgumentException("castling: some pieces between rook and king")
+
+          newBoard(row)(5) = Some(rook)
+          newBoard(row)(6) = Some(king)
+          newPositions(rook) = Position(row, 5)
+          newPositions(king) = Position(row, 6)
+
+          newCastlingRights(king.color)(0) = false
+          newCastlingRights(king.color)(1) = false
+
+        } else throw new IllegalArgumentException(s"castling: rook is positioned on a bad column (${rookPos.column})")
       }
 
       case Promotion(origin, promoted, destination) => {
-        val pawn = getPiece(origin)
-        pawn match {
-          case _: Pawn => ()
-          case _ => throw new IllegalArgumentException("promotion: piece is not a pawn")
+
+        val pawn = getPiece(origin).get // fail if no piece
+        if(pawn.pieceType != Pawn) throw new IllegalArgumentException("promotion: piece is not a pawn")
+
+        // remove deleted piece if needed
+        val deletedPieceOption = getPiece(destination)
+        deletedPieceOption.foreach { deletedPiece =>
+          if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
+          newPositions -= deletedPiece
         }
-        newBoard(origin.row)(origin.column) = null
-        var deletedPiece = board(destination.row)(destination.column)
+
         val newPiece = promoted match {
-          case 'r' => Rook(pawn.color, turn + 2) // just to be sure in case of perft
-          case 'n' => Knight(pawn.color, turn + 2)
-          case 'b' => Bishop(pawn.color, turn + 2)
-          case _ => Queen(pawn.color, turn + 2)
+          case t @ (Rook | Knight | Bishop | Queen) => ChessPiece(pawn.color, t, 8 + pawn.id) // just to be sure in case of perft
+          case t => throw new IllegalArgumentException(s"cannot promote pawn to $t")
         }
-        newBoard(destination.row)(destination.column) = newPiece
-        deletedPiece = if(deletedPiece != null) deletedPiece else Pawn(White, -1) // fake piece to avoid if statement
-        new ChessState(turn + 1, newBoard, positions + (newPiece -> destination) - pawn - deletedPiece, newCastlingRights, None)
+
+        newBoard(origin.row)(origin.column) = None
+        newBoard(destination.row)(destination.column) = Some(newPiece)
+        newPositions -= pawn
+        newPositions(newPiece) = destination
       }
 
       case EnPassant(origin, destination) => {
-        val piece = getPiece(origin)
-        newBoard(origin.row)(origin.column) = null
-        val deletedPiece = getPiece(Position(origin.row, destination.column))
-        if(deletedPiece == null) throw new IllegalArgumentException("en passant: there is no piece deleted in this en passant move")
-        newBoard(destination.row)(destination.column) = piece
-        newBoard(origin.row)(destination.column) = null
-        new ChessState(turn + 1, newBoard, positions + (piece -> destination) - deletedPiece, newCastlingRights, None)
+
+        val piece = getPiece(origin).get // fail if no piece
+        val deletedPiece = getPiece(Position(origin.row, destination.column)).get // fail if no piece
+
+        newBoard(destination.row)(destination.column) = Some(piece)
+        newBoard(origin.row)(destination.column) = None
+        newBoard(origin.row)(origin.column) = None
+        newPositions(piece) = destination
+        newPositions -= deletedPiece
       }
     }
+
+    ChessState(
+      (currentPlayer + 1) % 2,
+      toImmutableSeq(newBoard.map(toImmutableSeq)),
+      toImmutableMap(newPositions.toMap),
+      toImmutableMap(newCastlingRights.mapValues(toImmutableSeq).toMap),
+      newEnPassantPosition
+    )
+
   }
 
-  def threatens(piece: ChessPiece, destination: Position) = {
+  def threatens(piece: ChessPiece, destination: Position): Boolean = {
+
     val pos = positions(piece)
+
     val dx = destination.row - pos.row
     val dy = destination.column - pos.column
     val dir_x = if(dx >= 0) 1 else -1
     val dir_y = if(dy >= 0) 1 else -1
-    piece match {
-      case Pawn(color, _) => {
-        val direction = color match {
+
+    piece.pieceType match {
+      case Pawn => {
+        val direction = piece.color match {
           case White => 1
           case Black => -1
         }
         (dx == direction) && (abs(dy) == 1)
         // en passant is missing
       }
-      case Rook(_, _) => {
+      case Rook => {
         if(dx != 0 && dy != 0) false
         else if(dy == 0) {
-          if(abs(dx) <= 1) true
-          else (1 until abs(dx)).map(d => board(pos.row + dir_x * d)(pos.column) == null).reduceLeft(_ && _)
+          (1 until abs(dx)).forall(d => board(pos.row + dir_x * d)(pos.column).isEmpty)
         } else {
-          if(abs(dy) <= 1) true
-          else (1 until abs(dy)).map(d => board(pos.row)(pos.column + dir_y * d) == null).reduceLeft(_ && _)
+          (1 until abs(dy)).forall(d => board(pos.row)(pos.column + dir_y * d).isEmpty)
         }
       }
-      case Knight(_, _) => (abs(dx) == 2 && abs(dy) == 1) || (abs(dx) == 1 && abs(dy) == 2)
-      case Bishop(_, _) => {
+      case Knight => (abs(dx) == 2 && abs(dy) == 1) || (abs(dx) == 1 && abs(dy) == 2)
+      case Bishop => {
         if(abs(dx) != abs(dy)) false
-        else if(abs(dx) <= 1) true
         else {
-          (1 until abs(dx)).map(d => board(pos.row + dir_x * d)(pos.column + dir_y * d) == null).reduceLeft(_ && _)
+          (1 until abs(dx)).forall(d => board(pos.row + dir_x * d)(pos.column + dir_y * d).isEmpty)
         }
       }
-      case Queen(_, _) => {
+      case Queen => {
         if(dy == 0) {
-          if(abs(dx) <= 1) true
-          else (1 until abs(dx)).map(d => board(pos.row + dir_x * d)(pos.column) == null).reduceLeft(_ && _)
+          (1 until abs(dx)).forall(d => board(pos.row + dir_x * d)(pos.column).isEmpty)
         } else if(dx == 0) {
-          if(abs(dy) <= 1) true
-          else (1 until abs(dy)).map(d => board(pos.row)(pos.column + dir_y * d) == null).reduceLeft(_ && _)
+          (1 until abs(dy)).forall(d => board(pos.row)(pos.column + dir_y * d).isEmpty)
         } else if(abs(dx) == abs(dy)) {
-          if(abs(dx) <= 1) true
-          else {
-            (1 until abs(dx)).map(d => board(pos.row + dir_x * d)(pos.column + dir_y * d) == null).reduceLeft(_ && _)
-          }
+          (1 until abs(dx)).forall(d => board(pos.row + dir_x * d)(pos.column + dir_y * d).isEmpty)
         } else false
       }
-      case King(_) => (abs(dx) <= 1 && abs(dy) <= 1)
+      case King => abs(dx) <= 1 && abs(dy) <= 1
     }
   }
 
@@ -230,15 +267,14 @@ case class ChessState(
 
     def withinBoard(x: Int) = x >= 0 && x <= 7
 
-    // pawns
     val dir = if(color == White) 1 else -1
+
+    // pawns
     if(withinBoard(position.row + dir)) {
       for(dx <- -1 to 1 by 2) {
         if(withinBoard(position.column + dx)) {
-          val piece = board(position.row + dir)(position.column + dx)
-          piece match {
-            case Pawn(c, _) => if(c != color) return true
-            case _ => ()
+          board(position.row + dir)(position.column + dx).foreach { piece =>
+            if(piece.pieceType == Pawn && piece.color != color) return true
           }
         }
       }
@@ -250,12 +286,8 @@ case class ChessState(
       for(dir <- -1 to 1 by 2) {
         val dy = dir * abs_dy
         if(withinBoard(position.row + dx) && withinBoard(position.column + dy)) {
-          val piece = board(position.row + dx)(position.column + dy)
-          if(piece != null) {
-            piece match {
-              case Knight(c, _) => if(c != color) return true
-              case _ => ()
-            }
+          board(position.row + dx)(position.column + dy).foreach { piece =>
+            if(piece.pieceType == Knight && piece.color != color) return true
           }
         }
       }
@@ -263,30 +295,29 @@ case class ChessState(
 
     // the rest
     def moveInDirection(dx: Int, dy: Int) = {
-      var m = 1
       val Position(x, y) = position
-      while(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy) == null) {
-        m += 1
-      }
-      if(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy).color != color) {
-        val piece = board(x + m * dx)(y + m * dy)
+      val (threatX, threatY) = Stream.from(1).map(m => (x + m * dx, y + m * dy)).dropWhile { case (newX, newY) =>
+        withinBoard(newX) && withinBoard(newY) && board(newX)(newY).isEmpty
+      }.head
+
+      if(withinBoard(threatX) && withinBoard(threatY) && board(threatX)(threatY).get.color != color) {
+        val piece = board(threatX)(threatY).get
         if(dx == 0 || dy == 0) {
-          piece match {
-            case _: King => (m == 1)
-            case _: Queen => true
-            case _: Rook => true
+          piece.pieceType match {
+            case King => abs(threatX - x) <= 1 && abs(threatY - y) <= 1
+            case Queen | Rook => true
             case _ => false
           }
         } else {
-          piece match {
-            case _: King => (m == 1)
-            case _: Queen => true
-            case _: Bishop => true
+          piece.pieceType match {
+            case King => abs(threatX - x) <= 1 && abs(threatY - y) <= 1
+            case Queen | Bishop => true
             case _ => false
           }
         }
       } else false
     }
+
     for(d <- -1 to 1 by 2) {
       if(moveInDirection(d, 0)) return true
       if(moveInDirection(0, d)) return true
@@ -297,124 +328,134 @@ case class ChessState(
       }
     }
 
-    return false
+    false
   }
 
-  def isInCheck(color: Color) = {
-    val king_pos = positions(King(color))
-    isThreatened(king_pos, color)
+  def isInCheck(color: Color = Color.fromPlayer(currentPlayer)): Boolean = {
+    val kingPosition = positions(ChessPiece(color, King, 0))
+    isThreatened(kingPosition, color)
   }
 
-  def listMovesOf(piece: ChessPiece): List[ChessMove] = {
+  def listMovesOf(piece: ChessPiece): Seq[ChessMove] = {
 
     def withinBoard(x: Int) = x >= 0 && x <= 7
 
-    def moveInDirection(piece: ChessPiece, init: Position, dx: Int, dy: Int) = {
-      var output: List[ChessMove] = List()
-      var m = 1
+    def moveInDirection(piece: ChessPiece, init: Position, dx: Int, dy: Int): Seq[ChessMove] = {
+
       val Position(x, y) = init
-      while(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy) == null) {
-        output ::= RegularChessMove(init, Position(x + m * dx, y + m * dy))
-        m += 1
+
+      val emptyPositions: Seq[Position] = Stream.from(1).map(m => Position(x + m * dx, y + m * dy)).takeWhile { p =>
+        withinBoard(p.row) && withinBoard(p.column) && board(p.row)(p.column).isEmpty
       }
-      if(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy).color != piece.color) {
-        output ::= RegularChessMove(init, Position(x + m * dx, y + m * dy))
+
+      val nextM = emptyPositions.length + 1
+      val nextX = x + nextM * dx
+      val nextY = y + nextM * dy
+
+      val positions = if(withinBoard(nextX) && withinBoard(nextY) && board(nextX)(nextY).get.color != piece.color) {
+        emptyPositions :+ Position(nextX, nextY)
+      } else {
+        emptyPositions
       }
-      output
+
+      positions.map(RegularChessMove(init, _))
     }
 
-    var output: List[ChessMove] = List()
+    val moves = Seq.newBuilder[ChessMove]
     val color = piece.color
     val position = positions(piece)
 
-    piece match {
+    piece.pieceType match {
 
-      case Pawn(c, n) => {
+      case Pawn => {
         val direction = if(color == White) 1 else -1
-        val end_row = if(color == White) 7 else 0
-        if(withinBoard(position.row + direction) && board(position.row + direction)(position.column) == null) { // normal forward move
-          if(position.row + direction == end_row) { // promotions
-            output :::= List(
-              Promotion(position, 'r', Position(position.row + direction, position.column)),
-              Promotion(position, 'n', Position(position.row + direction, position.column)),
-              Promotion(position, 'b', Position(position.row + direction, position.column)),
-              Promotion(position, 'q', Position(position.row + direction, position.column))
+        val endRow = if(color == White) 7 else 0
+        if(withinBoard(position.row + direction) && board(position.row + direction)(position.column).isEmpty) { // normal forward move
+          if(position.row + direction == endRow) { // promotions
+            moves ++= List(
+              Promotion(position, Rook, Position(position.row + direction, position.column)),
+              Promotion(position, Knight, Position(position.row + direction, position.column)),
+              Promotion(position, Bishop, Position(position.row + direction, position.column)),
+              Promotion(position, Queen, Position(position.row + direction, position.column))
             )
-          } else output ::= RegularChessMove(position, Position(position.row + direction, position.column))
+          } else {
+            moves += RegularChessMove(position, Position(position.row + direction, position.column))
+          }
         }
-        val init_row = if(color == White) 1 else 6
-        if(position.row == init_row) { // initial double speed forward move
-          if(board(init_row + direction)(position.column) == null && board(init_row + 2 * direction)(position.column) == null) {
-            output ::= RegularChessMove(position, Position(position.row + 2 * direction, position.column))
+        val initRow = if(color == White) 1 else 6
+        if(position.row == initRow) { // initial double speed forward move
+          if(board(initRow + direction)(position.column).isEmpty && board(initRow + 2 * direction)(position.column).isEmpty) {
+            moves += RegularChessMove(position, Position(position.row + 2 * direction, position.column))
           }
         }
         if(withinBoard(position.row + direction)) { // capture move
           for(shift <- -1 to 1 by 2) {
             if(withinBoard(position.column + shift)
-              && board(position.row + direction)(position.column + shift) != null
-              && board(position.row + direction)(position.column + shift).color != color) {
-              if(position.row + direction == end_row) { // promotions
-                output :::= List(
-                  Promotion(position, 'r', Position(position.row + direction, position.column + shift)),
-                  Promotion(position, 'n', Position(position.row + direction, position.column + shift)),
-                  Promotion(position, 'b', Position(position.row + direction, position.column + shift)),
-                  Promotion(position, 'q', Position(position.row + direction, position.column + shift))
+              && board(position.row + direction)(position.column + shift).exists(_.color != color)) {
+              if(position.row + direction == endRow) { // promotions
+                moves ++= List(
+                  Promotion(position, Rook, Position(position.row + direction, position.column + shift)),
+                  Promotion(position, Knight, Position(position.row + direction, position.column + shift)),
+                  Promotion(position, Bishop, Position(position.row + direction, position.column + shift)),
+                  Promotion(position, Queen, Position(position.row + direction, position.column + shift))
                 )
-              } else output ::= RegularChessMove(position, Position(position.row + direction, position.column + shift))
-            }
-          }
-        }
-      }
-
-      case Rook(_, _) => {
-        for(dir <- -1 to 1 by 2) {
-          output :::= moveInDirection(piece, position, dir, 0)
-          output :::= moveInDirection(piece, position, 0, dir)
-        }
-      }
-
-      case Knight(_, _) => {
-        for(dx <- -2 to 2 if dx != 0) {
-          val abs_dy = 3 - abs(dx)
-          for(dir <- -1 to 1 by 2) {
-            val dy = dir * abs_dy
-            if(withinBoard(position.row + dx) && withinBoard(position.column + dy)) {
-              val destPiece = board(position.row + dx)(position.column + dy)
-              if(destPiece == null || destPiece.color != color) {
-                output ::= RegularChessMove(position, Position(position.row + dx, position.column + dy))
+              } else {
+                moves += RegularChessMove(position, Position(position.row + direction, position.column + shift))
               }
             }
           }
         }
       }
 
-      case Bishop(_, _) => {
-        for(dir_x <- -1 to 1 by 2) {
-          for(dir_y <- -1 to 1 by 2) {
-            output :::= moveInDirection(piece, position, dir_x, dir_y)
-          }
-        }
-      }
-
-      case Queen(_, _) => {
+      case Rook => {
         for(dir <- -1 to 1 by 2) {
-          output :::= moveInDirection(piece, position, dir, 0)
-          output :::= moveInDirection(piece, position, 0, dir)
+          moves ++= moveInDirection(piece, position, dir, 0)
+          moves ++= moveInDirection(piece, position, 0, dir)
         }
-        for(dir_x <- -1 to 1 by 2) {
-          for(dir_y <- -1 to 1 by 2) {
-            output :::= moveInDirection(piece, position, dir_x, dir_y)
+      }
+
+      case Knight => {
+        for(dx <- -2 to 2 if dx != 0) {
+          val abs_dy = 3 - abs(dx)
+          for(dir <- -1 to 1 by 2) {
+            val dy = dir * abs_dy
+            if(withinBoard(position.row + dx) && withinBoard(position.column + dy)) {
+              val destPiece = board(position.row + dx)(position.column + dy)
+              if(destPiece.forall(_.color != color)) {
+                moves += RegularChessMove(position, Position(position.row + dx, position.column + dy))
+              }
+            }
           }
         }
       }
 
-      case King(_) => {
+      case Bishop => {
+        for(dir_x <- -1 to 1 by 2) {
+          for(dir_y <- -1 to 1 by 2) {
+            moves ++= moveInDirection(piece, position, dir_x, dir_y)
+          }
+        }
+      }
+
+      case Queen => {
+        for(dir <- -1 to 1 by 2) {
+          moves ++= moveInDirection(piece, position, dir, 0)
+          moves ++= moveInDirection(piece, position, 0, dir)
+        }
+        for(dir_x <- -1 to 1 by 2) {
+          for(dir_y <- -1 to 1 by 2) {
+            moves ++= moveInDirection(piece, position, dir_x, dir_y)
+          }
+        }
+      }
+
+      case King => {
         for(dx <- -1 to 1) {
           for(dy <- -1 to 1 by 2) {
             if(withinBoard(position.row + dx) && withinBoard(position.column + dy)) {
               val destPiece = board(position.row + dx)(position.column + dy)
-              if(destPiece == null || destPiece.color != color) {
-                output ::= RegularChessMove(position, Position(position.row + dx, position.column + dy))
+              if(destPiece.forall(_.color != color)) {
+                moves += RegularChessMove(position, Position(position.row + dx, position.column + dy))
               }
             }
           }
@@ -422,246 +463,195 @@ case class ChessState(
         for(dx <- -1 to 1 by 2) {
           if(withinBoard(position.row + dx)) {
             val destPiece = board(position.row + dx)(position.column)
-            if(destPiece == null || destPiece.color != color) {
-              output ::= RegularChessMove(position, Position(position.row + dx, position.column))
+            if(destPiece.forall(_.color != color)) {
+              moves += RegularChessMove(position, Position(position.row + dx, position.column))
             }
           }
         }
       }
     }
 
-    output
-
+    moves.result
   }
 
-  def possibleMoves(): List[ChessMove] = {
+  def possibleMoves: Seq[ChessMove] = {
 
-    val color = if(turn % 2 == 0) White else Black
-    var moves = positions.keys.filter(_.color == color).flatMap(listMovesOf(_)).toList
+    val color = Color.fromPlayer(currentPlayer)
+    val moves: Seq[ChessMove] = positions.keys.filter(_.color == color).flatMap(listMovesOf).toSeq
+    val specialMoves = Seq.newBuilder[ChessMove]
 
     // castling
     val row = if(color == White) 0 else 7
     val color_code = if(color == White) 0 else 1
-    if(castlingRights(color_code)(0) && (1 to 3).map(board(row)(_) == null).reduceLeft(_ && _)) {
+    if(castlingRights(color)(0) && (1 to 3).forall(board(row)(_).isEmpty)) {
       if(!isInCheck(color) && !isThreatened(Position(row, 3), color)) {
-        moves ::= Castling(Position(row, 4), Position(row, 0))
+        specialMoves += Castling(Position(row, 4), Position(row, 0))
       }
     }
-    if(castlingRights(color_code)(1) && (5 to 6).map(board(row)(_) == null).reduceLeft(_ && _)) {
+    if(castlingRights(color)(1) && (5 to 6).forall(board(row)(_).isEmpty)) {
       if(!isInCheck(color) && !isThreatened(Position(row, 5), color)) {
-        moves ::= Castling(Position(row, 4), Position(row, 7))
+        specialMoves += Castling(Position(row, 4), Position(row, 7))
       }
     }
 
     // en passant
-    enPassantPosition match {
-      case Some(Position(row, col)) => {
-        val dir = if(color == White) 1 else -1
-        for(shift <- -1 to 1 by 2) {
-          if(col + shift >= 0 && col + shift <= 7) {
-            val piece = board(row - dir)(col + shift)
-            piece match {
-              case Pawn(c, _) if c == color => {
-                moves ::= EnPassant(Position(row - dir, col + shift), Position(row, col))
-              }
-              case _ => ()
-            }
+    enPassantPosition.foreach { case Position(row, col) =>
+      val dir = if(color == White) 1 else -1
+      for(shift <- -1 to 1 by 2) {
+        if(col + shift >= 0 && col + shift <= 7) {
+          board(row - dir)(col + shift) match {
+            case Some(p) if p.pieceType == Pawn && p.color == color =>
+              specialMoves += EnPassant(Position(row - dir, col + shift), Position(row, col))
+            case _ => ()
           }
         }
       }
-      case None => ()
     }
 
-    moves.filter(!apply(_).isInCheck(color))
+    (moves ++ specialMoves.result()).filter(!apply(_).isInCheck(color))
   }
 
-  def evaluate(): Option[Int] = {
-    val color = if(turn % 2 == 0) White else Black
-    val opponent_code = if(color == White) -1 else 1
-    if(possibleMoves.length == 0) {
-      if(isInCheck(color)) Some(opponent_code) else Some(0)
-    } else None
+  def evaluate: Evaluation = {
+    if(possibleMoves.isEmpty) {
+      if(isInCheck(Color.fromPlayer(currentPlayer))) Finished(-1) else Finished(0)
+    } else {
+      Playing
+    }
   }
 
-  override def toString(): String = {
-    val color = if(turn % 2 == 0) White else Black
-    var representation = "  a b c d e f g h \n"
+  override def toString: String = {
+
+    def pieceLetter(p: PieceType): String = p match {
+      case Pawn => "p"
+      case Rook => "r"
+      case Knight => "n"
+      case Bishop => "b"
+      case Queen => "q"
+      case King => "k"
+    }
+
+    val representation: mutable.StringBuilder = new mutable.StringBuilder()
+
+    val color = Color.fromPlayer(currentPlayer)
+    representation ++= "  a b c d e f g h \n"
     for(y <- 7 to 0 by -1) {
-      representation += " +-+-+-+-+-+-+-+-+\n" + (y + 1).toString
+      representation ++= s" +-+-+-+-+-+-+-+-+\n "
       for(x <- 0 to 7) {
-        val piece = board(y)(x)
-        representation += "|"
-        if(piece == null) representation += " "
-        else {
-          val code = piece match {
-            case Pawn(_, _) => "p"
-            case Rook(_, _) => "r"
-            case Knight(_, _) => "n"
-            case Bishop(_, _) => "b"
-            case Queen(_, _) => "q"
-            case King(_) => "k"
+        val pieceOption = board(y)(x)
+        representation ++= "|"
+        pieceOption match {
+          case None => representation ++= " "
+          case Some(piece) =>
+            val code = pieceLetter(piece.pieceType)
+            if (piece.color == White) representation ++= code.capitalize
+            else representation ++= code
+        }
+      }
+      representation ++= s"|${y + 1}\n"
+    }
+    representation ++= " +-+-+-+-+-+-+-+-+   " + color + " to play\n"
+    representation ++= "  a b c d e f g h "
+
+    representation.result()
+  }
+
+}
+
+object ChessState {
+
+  def apply(): ChessState = parseFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+
+  def parseFen(code: String): ChessState = {
+
+    val pattern: Regex = """([a-h])([1-8])""".r
+
+    def decodeAlgebraicNotation(code: String): Option[Position] = code match {
+      case pattern(col_str, row_str) => Some(Position(row_str.charAt(0) - '1', col_str.charAt(0) - 'a'))
+      case _ => None
+    }
+
+    def encodeAlgebraicNotation(position: Position): String = ('a' + position.column).toChar.toString + (1 + position.row).toString
+
+    def addPiece(board: MutableIndexedSeq[MutableIndexedSeq[Option[ChessPiece]]], piece: ChessPiece, pos: Position): Unit = {
+      board(pos.row)(pos.column) = Some(piece)
+    }
+
+    val words = code.split(" ")
+    if(words.length != 6) throw new IllegalArgumentException("Fen: wrong number of fields")
+
+    val castlingRights: MutableMap[Color, MutableIndexedSeq[Boolean]] = MutableMap(
+      White -> MutableIndexedSeq.fill(2)(false),
+      Black -> MutableIndexedSeq.fill(2)(false)
+    )
+    val board = MutableIndexedSeq.fill(8)(MutableIndexedSeq.fill[Option[ChessPiece]](8)(None))
+
+    // parse board description
+    var row = 7
+    var col = 0
+    val indices: MutableMap[Char, Int] = MutableMap().withDefaultValue(0)
+    for(c <- words(0)) {
+      c match {
+        case '/' => {
+          row -= 1
+          col = 0
+        }
+        case _ if c - '0' >= 1 && c - '0' <= 8 => col += c - '0'
+        case _ => {
+          c match {
+            case 'p' => addPiece(board, ChessPiece(Black, Pawn, indices(c)), Position(row, col))
+            case 'r' => addPiece(board, ChessPiece(Black, Rook, indices(c)), Position(row, col))
+            case 'n' => addPiece(board, ChessPiece(Black, Knight, indices(c)), Position(row, col))
+            case 'b' => addPiece(board, ChessPiece(Black, Bishop, indices(c)), Position(row, col))
+            case 'q' => addPiece(board, ChessPiece(Black, Queen, indices(c)), Position(row, col))
+            case 'k' => addPiece(board, ChessPiece(Black, King, indices(c)), Position(row, col))
+            case 'P' => addPiece(board, ChessPiece(White, Pawn, indices(c)), Position(row, col))
+            case 'R' => addPiece(board, ChessPiece(White, Rook, indices(c)), Position(row, col))
+            case 'N' => addPiece(board, ChessPiece(White, Knight, indices(c)), Position(row, col))
+            case 'B' => addPiece(board, ChessPiece(White, Bishop, indices(c)), Position(row, col))
+            case 'Q' => addPiece(board, ChessPiece(White, Queen, indices(c)), Position(row, col))
+            case 'K' => addPiece(board, ChessPiece(White, King, indices(c)), Position(row, col))
+            case d => throw new IllegalArgumentException("Fen: did not understand board description: " + d)
           }
-          if(piece.color == White) representation += code.capitalize
-          else representation += code
-        }
-      }
-      representation += "|" + (y + 1).toString + "\n"
-    }
-    representation += " +-+-+-+-+-+-+-+-+   " + color + " to play\n"
-    representation += "  a b c d e f g h "
-
-    representation
-  }
-
-  override def features(): Array[Feature] = {
-
-    implicit def bool2int(b:Boolean) = if (b) 1 else 0
-
-    val n_features = 100
-    val features: ArrayBuffer[Feature] = new ArrayBuffer
-    for(color_code <- 0 to 1) {
-      val color = if(color_code == 0) White else Black
-
-      features += Feature(color.toString + " in check", isInCheck(color):Int)
-
-      features += Feature("# " + color.toString + " pawns",
-        positions.keysIterator.map(piece => piece match {
-          case Pawn(c, _) if c == color => 1
-          case _ => 0
-        }).reduceLeft(_ + _))
-
-      features += Feature("# " + color.toString + " rooks",
-        positions.keysIterator.map(piece => piece match {
-          case Rook(c, _) if c == color => 1
-          case _ => 0
-        }).reduceLeft(_ + _))
-
-      features += Feature("# " + color.toString + " knights",
-        positions.keysIterator.map(piece => piece match {
-          case Knight(c, _) if c == color => 1
-          case _ => 0
-        }).reduceLeft(_ + _))
-
-      features += Feature("# " + color.toString + " bishops",
-        positions.keysIterator.map(piece => piece match {
-          case Bishop(c, _) if c == color => 1
-          case _ => 0
-        }).reduceLeft(_ + _))
-
-      features += Feature("# " + color.toString + " queens",
-        positions.keysIterator.map(piece => piece match {
-          case Queen(c, _) if c == color => 1
-          case _ => 0
-        }).reduceLeft(_ + _))
-
-      for(i <- 0 to 1) {
-        val order_name = if(i == 0) "first" else "second"
-        val pieces = Map("rook" -> Rook(color, i),
-          "knight" -> Knight(color, i),
-          "bishop" -> Bishop(color, i),
-          "queen" -> Queen(color, i) // we use two queens because it is usual to obtain a second queen
-        )
-
-        for((name, piece) <- pieces) {
-          features += Feature("# pieces threatening " + order_name + " " + color.toString + " " + name,
-            if(positions.contains(piece)) {
-              positions.keysIterator.filter(_.color != color).map(threatens(_, positions(piece)):Int).reduceLeft(_ + _)
-            } else 0)
-          features += Feature("# pieces defending " + order_name + " " + color.toString + " " + name,
-            if(positions.contains(piece)) {
-              positions.keysIterator.filter(_.color == color).filter(_ != piece).map(threatens(_, positions(piece)):Int).reduceLeft(_ + _)
-            } else 0)
+          indices(c) += 1
+          col += 1
         }
       }
     }
 
-    features.toArray
-  }
-
-  def pieceCode(piece: ChessPiece) = piece match {
-    case Pawn(White, _) => 0
-    case Pawn(Black, _) => 1
-    case Rook(White, _) => 2
-    case Rook(Black, _) => 3
-    case Knight(White, _) => 4
-    case Knight(Black, _) => 5
-    case Bishop(White, _) => 6
-    case Bishop(Black, _) => 7
-    case Queen(White, _) => 8
-    case Queen(Black, _) => 9
-    case King(White) => 10
-    case King(Black) => 11
-    case _ => 11
-  }
-
-  override def hashCode: Int = {
-    var h = (turn % 2) * ChessState.turn_hash
-    for(i <- 0 until 2) {
-      for(j <- 0 until 2) {
-        if(castlingRights(i)(j)) h = h ^ ChessState.castling_hash(i)(j)
+    // parse castling rights
+    for(c <- words(2)) {
+      c match {
+        case 'Q' => castlingRights(White)(0) = true
+        case 'K' => castlingRights(White)(1) = true
+        case 'q' => castlingRights(Black)(0) = true
+        case 'k' => castlingRights(Black)(1) = true
+        case '-' => ()
+        case _ => throw new IllegalArgumentException("Fen: did not understand castling rights")
       }
     }
-    enPassantPosition match {
-      case Some(Position(row, col)) => {
-        h = h ^ ChessState.enpassant_hash(if(row == 2) 0 else 1)(col)
-      }
-      case None => ()
+
+    // parse en passant marker
+    val enPassantPosition = words(3) match {
+      case "-" => None
+      case s => decodeAlgebraicNotation(s)
     }
-    for(i <- 0 until 8) {
-      for(j <- 0 until 8) {
-        val piece = board(i)(j)
-        if(piece != null) h = h ^ ChessState.board_hash(i * 8 + j)(pieceCode(piece))
-      }
-    }
-    return h
+
+    // parse turn
+    val turn = 2 * (words(5).toInt - 1) + ( if(words(1) == "b") 1 else 0 )
+
+    val positions: Seq[(ChessPiece, Position)] = for(
+      (seq, row) <- board.zipWithIndex;
+      (pieceOption, column) <- board(row).zipWithIndex;
+      piece <- pieceOption.toSeq
+    ) yield piece -> Position(row, column)
+
+    ChessState(
+      turn % 2,
+      toImmutableSeq(board.map(toImmutableSeq)),
+      toImmutableMap(positions.toMap),
+      toImmutableMap(castlingRights.mapValues(toImmutableSeq).toMap),
+      enPassantPosition
+    )
   }
 
-  override def equals(that: Any): Boolean = that match {
-    case that: ChessState => this.hashCode == that.hashCode
-    case _ => false
-  }
-
-  def decodeANMove(code: String): Option[ChessMove] = code.length match {
-    case 4 => { // anything but promotion
-      val srcOption = ChessState.decodeAlgebraicNotation(code.slice(0,2))
-      val destOption = ChessState.decodeAlgebraicNotation(code.slice(2,4))
-      if(srcOption == None || destOption == None) return None
-      val src = srcOption.get
-      val dest = destOption.get
-
-      val d_row = dest.row - src.row
-      val d_col = dest.column - src.column
-      val piece = getPiece(src)
-
-      // castling
-      if((piece == King(White) || piece == King(Black)) && abs(d_col) == 2) {
-        return Some(Castling(src, Position(dest.row, if(d_col > 0) 7 else 0)))
-      }
-
-      // en passant
-      piece match {
-        case Pawn(_, _) => if(abs(d_col) > 0 && getPiece(dest) == null) return Some(EnPassant(src, dest))
-        case _ => ()
-      }
-
-      return Some(RegularChessMove(src, dest))
-    }
-    case 5 => { // promotion
-      val src = ChessState.decodeAlgebraicNotation(code.slice(0,2))
-      val dest = ChessState.decodeAlgebraicNotation(code.slice(2,4))
-      if(src != None && dest != None) Some(Promotion(src.get, code(4), dest.get))
-      else None
-    }
-    case _ => None
-  }
-
-  def encodeANMove(move: ChessMove): String = move match {
-    case RegularChessMove(src, dest) => ChessState.encodeAlgebraicNotation(src) + ChessState.encodeAlgebraicNotation(dest)
-    case Promotion(src, promoted, dest) => ChessState.encodeAlgebraicNotation(src) + ChessState.encodeAlgebraicNotation(dest) + promoted
-    case Castling(kingPos, rookPos) => if(rookPos.column > kingPos.column)
-      ChessState.encodeAlgebraicNotation(kingPos) + ChessState.encodeAlgebraicNotation(Position(kingPos.row, kingPos.column + 2))
-    else
-      ChessState.encodeAlgebraicNotation(kingPos) + ChessState.encodeAlgebraicNotation(Position(kingPos.row, kingPos.column - 2))
-    case EnPassant(src, dest) => ChessState.encodeAlgebraicNotation(src) + ChessState.encodeAlgebraicNotation(dest)
-  }
 }

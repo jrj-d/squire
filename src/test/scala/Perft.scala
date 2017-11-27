@@ -1,9 +1,8 @@
-package squire.chess
+package old
 
 import scala.io.Source
 import org.scalatest.FunSpec
 import old.Color._
-import old.{Color => _, _}
 
 case class MoveCount(val leaves: Long,
 					 val enPassant: Long,
