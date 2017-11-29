@@ -1,5 +1,9 @@
 package squire.chess
 
+import squire.base.State
+import squire.utils.Tabulator
+
+import scala.collection.immutable.ListMap
 import scala.io.{BufferedSource, Source}
 
 object Performance {
@@ -11,8 +15,7 @@ object Performance {
     (result, (t1 - t0) / 1e6)
   }
 
-  // count the number of (path, en passant, castling)
-  def countMoves(state: ChessState, depth: Int): Int = depth match {
+  def countMoves[S <: State[S]](state: S, depth: Int): Int = depth match {
 
     case 1 => {
       val moves = state.possibleMoves
@@ -25,27 +28,87 @@ object Performance {
     }
   }
 
-  def main(args: Array[String]): Unit = {
-    val perfts: BufferedSource = Source.fromURL(getClass.getResource("/perfts.fen"))
+  case class Perft(fen: String, depth: Int)
 
-    for(perft <- perfts.getLines if !perft.startsWith("#")) {
-      val words = perft.split(" ")
-      val fen = words.slice(0, 6).reduceLeft(_ + " " + _)
-      val depth = words(6).toInt
-      val initState = ChessState.parseFen(fen)
-      val alternateState = new ChessState(initState.currentPlayer, initState.board, initState.positions, initState.castlingRights, initState.enPassantPosition) {
-        override def isInCheck(color: Color): Boolean = {
-          val kingPosition = positions(ChessPiece(color, King, 0))
-          positions.keys.filter(_.color != color).map(threatens(_, kingPosition)).reduceLeft(_ || _)
-        }
-      }
+  case class Result(nMoves: Int, duration: Double)
 
-      val (nLeaves, duration) = time(countMoves(initState, depth))
-      val (nLeavesAlternate, durationAlternate) = time(countMoves(alternateState, depth))
-
-      println(s"Fen $fen at depth $depth run in $duration ms for $nLeaves leaves with normal engine")
-      println(s"Fen $fen at depth $depth run in $durationAlternate ms for $nLeavesAlternate leaves with alternate engine using method threatens()")
-    }
+  def evaluatePerft[S <: State[S]](perft: Perft, stateCreator: String => S): Result = {
+    val initState = stateCreator(perft.fen)
+    val (nLeaves, duration) = time(countMoves(initState, perft.depth))
+    Result(nLeaves, duration)
   }
 
+  def readFen(line: String): Perft = {
+    val words = line.split(" ")
+    val fen = words.slice(0, 6).reduceLeft(_ + " " + _)
+    val depth = words(6).toInt
+    Perft(fen, depth)
+  }
+
+  def readPerftFile(source: BufferedSource): Iterator[Perft] = {
+    for(
+      line <- source.getLines if !line.startsWith("#")
+    ) yield readFen(line)
+  }
+
+  def runBenchmark[S <: State[S]](perfts: Seq[Perft], programs: ListMap[String, String => S]): Unit = {
+
+    val results: Seq[Seq[Result]] = for (
+      perft <- perfts
+    ) yield {
+      for(
+        program <- programs.values.toSeq
+      ) yield evaluatePerft(perft, program)
+    }
+
+    println("")
+    println("Number of leaves")
+    println("====================================")
+    println("")
+
+    val leaves: String = Tabulator.format(
+      ("Perft" +: programs.keys.toSeq) +:
+        perfts.zip(results).map { case (perft, row) =>
+          s"${perft.fen} at depth ${perft.depth}" +: row.map(_.nMoves)
+        }
+    )
+    println(leaves)
+
+    println("")
+    println("Duration in ms")
+    println("====================================")
+    println("")
+
+    val durations: String = Tabulator.format(
+      ("Perft" +: programs.keys.toSeq) +:
+      perfts.zip(results).map { case (perft, row) =>
+        s"${perft.fen} at depth ${perft.depth}" +: row.map(_.duration)
+      }.toList
+    )
+    println(durations)
+
+  }
+
+  def main(args: Array[String]): Unit = {
+
+    val source: BufferedSource = Source.fromURL(getClass.getResource("/perfts.fen"))
+    val perfts: Seq[Perft] = readPerftFile(source).toList
+
+    val programs = ListMap(
+
+      "initial revamp" -> ((s: String) => ChessState.parseFen(s)),
+
+      "initial revamp with threatens" -> { (s: String) =>
+        val originalState = ChessState.parseFen(s)
+        new ChessState(originalState.currentPlayer, originalState.board, originalState.positions, originalState.castlingRights, originalState.enPassantPosition) {
+          override def isInCheck(color: Color): Boolean = {
+            val kingPosition = positions(ChessPiece(color, King, 0))
+            positions.keys.filter(_.color != color).map(threatens(_, kingPosition)).reduceLeft(_ || _)
+          }
+        }
+      },
+    )
+
+    runBenchmark(perfts, programs)
+  }
 }

@@ -13,7 +13,6 @@ object Performance {
     (result, (t1 - t0) / 1e6)
   }
 
-  // count the number of (path, en passant, castling)
   def countMoves(state: ChessState, depth: Int): Int = depth match {
 
     case 1 => {
