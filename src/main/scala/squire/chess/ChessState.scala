@@ -1,7 +1,6 @@
 package squire.chess
 
 import squire.base.{Evaluation, Finished, Playing, State}
-import squire.utils._
 
 import scala.collection.immutable.{Map => ImmutableMap}
 import scala.collection.mutable
