@@ -10,7 +10,7 @@ import scala.util.matching.Regex
 
 case class OptimizedChessState(
                        currentPlayer: Int,
-                       board: IndexedSeq[IndexedSeq[Option[ChessPiece]]],
+                       board: Array[Array[Option[ChessPiece]]],
                        positions: ImmutableMap[ChessPiece, Position],
                        castlingRights: ImmutableMap[Color, IndexedSeq[Boolean]],
                        enPassantPosition: Option[Position]
@@ -31,7 +31,7 @@ case class OptimizedChessState(
     // The expected behavior is: throw an exception if the move is not valid.
     // That's why there are some unsafe pieces of code.
 
-    val newBoard = MutableIndexedSeq(board.map(row => MutableIndexedSeq(row:_*)):_*)
+    val newBoard = board.map(_.clone)
     val newCastlingRights = MutableMap(castlingRights.mapValues(row => MutableIndexedSeq(row:_*)).toSeq:_*)
     val newPositions = MutableMap(positions.toSeq:_*)
     var newEnPassantPosition: Option[Position] = None
@@ -168,7 +168,7 @@ case class OptimizedChessState(
 
     OptimizedChessState(
       (currentPlayer + 1) % 2,
-      IndexedSeq(newBoard.map(row => IndexedSeq(row:_*)):_*),
+      newBoard,
       ImmutableMap(newPositions.toSeq:_*),
       ImmutableMap(newCastlingRights.mapValues(row => IndexedSeq(row:_*)).toSeq:_*),
       newEnPassantPosition
@@ -531,7 +531,7 @@ object OptimizedChessState {
 
     def encodeAlgebraicNotation(position: Position): String = ('a' + position.column).toChar.toString + (1 + position.row).toString
 
-    def addPiece(board: MutableIndexedSeq[MutableIndexedSeq[Option[ChessPiece]]], piece: ChessPiece, pos: Position): Unit = {
+    def addPiece(board: Array[Array[Option[ChessPiece]]], piece: ChessPiece, pos: Position): Unit = {
       board(pos.row)(pos.column) = Some(piece)
     }
 
@@ -542,7 +542,7 @@ object OptimizedChessState {
       White -> MutableIndexedSeq.fill(2)(false),
       Black -> MutableIndexedSeq.fill(2)(false)
     )
-    val board = MutableIndexedSeq.fill(8)(MutableIndexedSeq.fill[Option[ChessPiece]](8)(None))
+    val board = Array.fill(8)(Array.fill[Option[ChessPiece]](8)(None))
 
     // parse board description
     var row = 7
@@ -606,7 +606,7 @@ object OptimizedChessState {
 
     OptimizedChessState(
       turn % 2,
-      IndexedSeq(board.map(row => IndexedSeq(row:_*)):_*),
+      board,
       ImmutableMap(positions.toSeq:_*),
       ImmutableMap(castlingRights.mapValues(row => IndexedSeq(row:_*)).toSeq:_*),
       enPassantPosition
