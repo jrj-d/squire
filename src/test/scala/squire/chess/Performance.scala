@@ -15,7 +15,7 @@ object Performance {
     (result, (t1 - t0) / 1e6)
   }
 
-  def countMoves[S <: State[S]](state: S, depth: Int): Int = depth match {
+  def countMoves[S <: State[S]](state: State[S], depth: Int): Int = depth match {
 
     case 1 => {
       val moves = state.possibleMoves
@@ -32,7 +32,7 @@ object Performance {
 
   case class Result(nMoves: Int, duration: Double)
 
-  def evaluatePerft[S <: State[S]](perft: Perft, stateCreator: String => S): Result = {
+  def evaluatePerft(perft: Perft, stateCreator: String => (State[S] forSome {type S <: State[S]})): Result = {
     val initState = stateCreator(perft.fen)
     val (nLeaves, duration) = time(countMoves(initState, perft.depth))
     Result(nLeaves, duration)
@@ -51,7 +51,7 @@ object Performance {
     ) yield readFen(line)
   }
 
-  def runBenchmark[S <: State[S]](perfts: Seq[Perft], programs: ListMap[String, String => S]): Unit = {
+  def runBenchmark(perfts: Seq[Perft], programs: ListMap[String, String => (State[S] forSome {type S <: State[S]})]): Unit = {
 
     val results: Seq[Seq[Result]] = for (
       perft <- perfts
@@ -94,11 +94,11 @@ object Performance {
     val source: BufferedSource = Source.fromURL(getClass.getResource("/perfts.fen"))
     val perfts: Seq[Perft] = readPerftFile(source).toList
 
-    val programs = ListMap(
+    val programs = ListMap[String, String => (State[S] forSome {type S <: State[S]})](
 
       "initial revamp" -> ((s: String) => ChessState.parseFen(s)),
 
-      "initial revamp with threatens" -> { (s: String) =>
+      /*"initial revamp with threatens" -> { (s: String) =>
         val originalState = ChessState.parseFen(s)
         new ChessState(originalState.currentPlayer, originalState.board, originalState.positions, originalState.castlingRights, originalState.enPassantPosition) {
           override def isInCheck(color: Color): Boolean = {
@@ -106,7 +106,9 @@ object Performance {
             positions.keys.filter(_.color != color).map(threatens(_, kingPosition)).reduceLeft(_ || _)
           }
         }
-      },
+      },*/
+
+      "optimized revamp" -> ((s: String) => OptimizedChessState.parseFen(s))
     )
 
     runBenchmark(perfts, programs)
