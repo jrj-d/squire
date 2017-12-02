@@ -12,7 +12,7 @@ case class OptimizedChessState(
                        currentPlayer: Int,
                        board: Array[Array[Option[ChessPiece]]],
                        positions: ImmutableMap[ChessPiece, Position],
-                       castlingRights: ImmutableMap[Color, IndexedSeq[Boolean]],
+                       castlingRights: Array[Array[Boolean]],
                        enPassantPosition: Option[Position]
                      ) extends State[OptimizedChessState] {
 
@@ -32,7 +32,7 @@ case class OptimizedChessState(
     // That's why there are some unsafe pieces of code.
 
     val newBoard = board.map(_.clone)
-    val newCastlingRights = MutableMap(castlingRights.mapValues(row => MutableIndexedSeq(row:_*)).toSeq:_*)
+    val newCastlingRights = castlingRights.map(_.clone)
     val newPositions = MutableMap(positions.toSeq:_*)
     var newEnPassantPosition: Option[Position] = None
 
@@ -57,17 +57,17 @@ case class OptimizedChessState(
         // handle castling rights
         piece.pieceType match {
           case King =>
-            newCastlingRights(piece.color)(0) = false
-            newCastlingRights(piece.color)(1) = false
+            newCastlingRights(piece.color.id)(0) = false
+            newCastlingRights(piece.color.id)(1) = false
           case Rook =>
-            newCastlingRights(piece.color)(piece.id) = false
+            newCastlingRights(piece.color.id)(piece.id) = false
           case _ => ()
         }
 
         // handle castling rights if a rook is captured
         deletedPieceOption.foreach { deletedPiece =>
           if (deletedPiece.pieceType == Rook & deletedPiece.id <= 1) {
-            newCastlingRights(deletedPiece.color)(deletedPiece.id) = false
+            newCastlingRights(deletedPiece.color.id)(deletedPiece.id) = false
           }
         }
 
@@ -109,8 +109,8 @@ case class OptimizedChessState(
           newPositions(rook) = Position(row, 3)
           newPositions(king) = Position(row, 2)
 
-          newCastlingRights(king.color)(0) = false
-          newCastlingRights(king.color)(1) = false
+          newCastlingRights(king.color.id)(0) = false
+          newCastlingRights(king.color.id)(1) = false
 
         } else if(rookPos.column == 7) {
 
@@ -124,8 +124,8 @@ case class OptimizedChessState(
           newPositions(rook) = Position(row, 5)
           newPositions(king) = Position(row, 6)
 
-          newCastlingRights(king.color)(0) = false
-          newCastlingRights(king.color)(1) = false
+          newCastlingRights(king.color.id)(0) = false
+          newCastlingRights(king.color.id)(1) = false
 
         } else throw new IllegalArgumentException(s"castling: rook is positioned on a bad column (${rookPos.column})")
       }
@@ -170,7 +170,7 @@ case class OptimizedChessState(
       (currentPlayer + 1) % 2,
       newBoard,
       ImmutableMap(newPositions.toSeq:_*),
-      ImmutableMap(newCastlingRights.mapValues(row => IndexedSeq(row:_*)).toSeq:_*),
+      newCastlingRights,
       newEnPassantPosition
     )
 
@@ -441,13 +441,12 @@ case class OptimizedChessState(
 
     // castling
     val row = if(color == White) 0 else 7
-    val color_code = if(color == White) 0 else 1
-    if(castlingRights(color)(0) && (1 to 3).forall(board(row)(_).isEmpty)) {
+    if(castlingRights(color.id)(0) && (1 to 3).forall(board(row)(_).isEmpty)) {
       if(!isInCheck(color) && !isThreatened(Position(row, 3), color)) {
         specialMoves += Castling(Position(row, 4), Position(row, 0))
       }
     }
-    if(castlingRights(color)(1) && (5 to 6).forall(board(row)(_).isEmpty)) {
+    if(castlingRights(color.id)(1) && (5 to 6).forall(board(row)(_).isEmpty)) {
       if(!isInCheck(color) && !isThreatened(Position(row, 5), color)) {
         specialMoves += Castling(Position(row, 4), Position(row, 7))
       }
@@ -538,10 +537,7 @@ object OptimizedChessState {
     val words = code.split(" ")
     if(words.length != 6) throw new IllegalArgumentException("Fen: wrong number of fields")
 
-    val castlingRights: MutableMap[Color, MutableIndexedSeq[Boolean]] = MutableMap(
-      White -> MutableIndexedSeq.fill(2)(false),
-      Black -> MutableIndexedSeq.fill(2)(false)
-    )
+    val castlingRights = Array.fill(2)(Array.fill(2)(false))
     val board = Array.fill(8)(Array.fill[Option[ChessPiece]](8)(None))
 
     // parse board description
@@ -580,10 +576,10 @@ object OptimizedChessState {
     // parse castling rights
     for(c <- words(2)) {
       c match {
-        case 'Q' => castlingRights(White)(0) = true
-        case 'K' => castlingRights(White)(1) = true
-        case 'q' => castlingRights(Black)(0) = true
-        case 'k' => castlingRights(Black)(1) = true
+        case 'Q' => castlingRights(White.id)(0) = true
+        case 'K' => castlingRights(White.id)(1) = true
+        case 'q' => castlingRights(Black.id)(0) = true
+        case 'k' => castlingRights(Black.id)(1) = true
         case '-' => ()
         case _ => throw new IllegalArgumentException("Fen: did not understand castling rights")
       }
@@ -608,7 +604,7 @@ object OptimizedChessState {
       turn % 2,
       board,
       ImmutableMap(positions.toSeq:_*),
-      ImmutableMap(castlingRights.mapValues(row => IndexedSeq(row:_*)).toSeq:_*),
+      castlingRights,
       enPassantPosition
     )
   }
