@@ -33,8 +33,8 @@ case class OptimizedChessState(
 
     val newBoard = board.map(_.clone)
     val newCastlingRights = castlingRights.map(_.clone)
-    val newPositions = MutableMap(positions.toSeq:_*)
     var newEnPassantPosition: Option[Position] = None
+    var newPositions: ImmutableMap[ChessPiece, Position] = Map.empty[ChessPiece, Position]
 
     move match {
 
@@ -42,17 +42,18 @@ case class OptimizedChessState(
 
         val piece = getPiece(origin).get // fail if no moved piece
 
-        // remove deleted piece if needed
         val deletedPieceOption = getPiece(destination)
-        deletedPieceOption.foreach { deletedPiece =>
-          if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
-          newPositions -= deletedPiece
+        deletedPieceOption match {
+          case Some(deletedPiece) =>
+            if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
+            newPositions = positions + (piece -> destination) - deletedPiece
+          case None =>
+            newPositions = positions + (piece -> destination)
         }
 
         // move piece
         newBoard(destination.row)(destination.column) = Some(piece)
         newBoard(origin.row)(origin.column) = None
-        newPositions(piece) = destination
 
         // handle castling rights
         piece.pieceType match {
@@ -106,8 +107,7 @@ case class OptimizedChessState(
 
           newBoard(row)(3) = Some(rook)
           newBoard(row)(2) = Some(king)
-          newPositions(rook) = Position(row, 3)
-          newPositions(king) = Position(row, 2)
+          newPositions = positions + (rook -> Position(row, 3)) + (king -> Position(row, 2))
 
           newCastlingRights(king.color.id)(0) = false
           newCastlingRights(king.color.id)(1) = false
@@ -121,8 +121,7 @@ case class OptimizedChessState(
 
           newBoard(row)(5) = Some(rook)
           newBoard(row)(6) = Some(king)
-          newPositions(rook) = Position(row, 5)
-          newPositions(king) = Position(row, 6)
+          newPositions = positions + (rook -> Position(row, 5)) + (king -> Position(row, 6))
 
           newCastlingRights(king.color.id)(0) = false
           newCastlingRights(king.color.id)(1) = false
@@ -135,22 +134,22 @@ case class OptimizedChessState(
         val pawn = getPiece(origin).get // fail if no piece
         if(pawn.pieceType != Pawn) throw new IllegalArgumentException("promotion: piece is not a pawn")
 
-        // remove deleted piece if needed
-        val deletedPieceOption = getPiece(destination)
-        deletedPieceOption.foreach { deletedPiece =>
-          if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
-          newPositions -= deletedPiece
-        }
-
         val newPiece = promoted match {
           case t @ (Rook | Knight | Bishop | Queen) => ChessPiece(pawn.color, t, 8 + pawn.id) // just to be sure in case of perft
           case t => throw new IllegalArgumentException(s"cannot promote pawn to $t")
         }
 
+        val deletedPieceOption = getPiece(destination)
+        deletedPieceOption match {
+          case Some(deletedPiece) =>
+            if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
+            newPositions = positions + (newPiece -> destination) - deletedPiece - pawn
+          case None =>
+            newPositions = positions + (newPiece -> destination) - pawn
+        }
+
         newBoard(origin.row)(origin.column) = None
         newBoard(destination.row)(destination.column) = Some(newPiece)
-        newPositions -= pawn
-        newPositions(newPiece) = destination
       }
 
       case EnPassant(origin, destination) => {
@@ -161,15 +160,14 @@ case class OptimizedChessState(
         newBoard(destination.row)(destination.column) = Some(piece)
         newBoard(origin.row)(destination.column) = None
         newBoard(origin.row)(origin.column) = None
-        newPositions(piece) = destination
-        newPositions -= deletedPiece
+        newPositions = positions + (piece -> destination) - deletedPiece
       }
     }
 
     OptimizedChessState(
       (currentPlayer + 1) % 2,
       newBoard,
-      ImmutableMap(newPositions.toSeq:_*),
+      newPositions,
       newCastlingRights,
       newEnPassantPosition
     )
@@ -603,7 +601,7 @@ object OptimizedChessState {
     OptimizedChessState(
       turn % 2,
       board,
-      ImmutableMap(positions.toSeq:_*),
+      positions.toMap,
       castlingRights,
       enPassantPosition
     )
