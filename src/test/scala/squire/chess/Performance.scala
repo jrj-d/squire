@@ -53,11 +53,11 @@ object Performance {
 
   def runBenchmark(perfts: Seq[Perft], programs: ListMap[String, String => (State[S] forSome {type S <: State[S]})]): Unit = {
 
-    val results: Seq[Seq[Result]] = for (
-      perft <- perfts
+    val results: List[List[Result]] = for (
+      perft <- perfts.toList
     ) yield {
       for(
-        program <- programs.values.toSeq
+        program <- programs.values.toList
       ) yield evaluatePerft(perft, program)
     }
 
