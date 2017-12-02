@@ -1,6 +1,6 @@
+package old
 
-
-package object old {
+object XBoard {
 
 	var continue = true
 	var forced = false

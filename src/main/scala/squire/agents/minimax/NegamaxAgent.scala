@@ -1,30 +1,24 @@
 package squire.agents.minimax
 
-import java.text.DecimalFormat
-
 import com.typesafe.scalalogging.Logger
-import squire.base.{Finished, Playing, State}
-import squire.base.Agent
+import squire.base.{Agent, Finished, Playing, State}
+import squire.utils.time
 
 class NegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends Agent[S] {
 
   val logger = Logger("NegamaxAgent")
-  val formatter = new DecimalFormat("#.##")
 
   def play(state: S): S#Move = findBestMove(state, maxDepth)
 
   def findBestMove(state: S, depth: Int): S#Move = {
 
-    val startTime = System.currentTimeMillis
-
-    val bestMove = state.possibleMoves
+    val (bestMove, duration) = time(state.possibleMoves
         .map { m => (m, negamax(state.apply(m), depth - 1).invert) }
         .maxBy(_._2)
         ._1
+    )
 
-    val duration = (System.currentTimeMillis - startTime) / 60000.0
-
-    logger.info(s"$depth-ply depth evaluated in ${formatter.format(duration)} minutes. Best move: $bestMove")
+    logger.info(f"$depth-ply depth evaluated in $duration%1.0f ms. Best move: $bestMove")
 
     bestMove
   }

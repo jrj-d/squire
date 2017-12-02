@@ -1,7 +1,7 @@
 package squire.chess
 
 import squire.base.State
-import squire.utils.Tabulator
+import squire.utils.{time, Tabulator}
 
 import scala.collection.immutable.ListMap
 import scala.io.{BufferedSource, Source}

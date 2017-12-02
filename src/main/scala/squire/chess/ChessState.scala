@@ -8,43 +8,14 @@ import scala.collection.mutable.{ListBuffer, Map => MutableMap}
 import scala.math.abs
 import scala.util.matching.Regex
 
-sealed abstract class Color(val id: Int) {
-  def opponent: Color = this match {
-    case Black => White
-    case White => Black
-  }
-}
-case object White extends Color(0)
-case object Black extends Color(1)
-object Color {
-  def fromPlayer(i: Int): Color = i match {
-    case 0 => White
-    case 1 => Black
-    case _ => throw new IllegalArgumentException(s"Unknown chess player numbered $i (should be 0 or 1)")
-  }
-}
+// This is a straightforward implementation of the rules of chess.
+// There is no modern implementation tricks like bitboards.
+// For performance reasons, some arguments of ChessState are mutable, which defies the purpose of case classes...
 
-
-sealed trait PieceType
-case object Pawn extends PieceType
-case object King extends PieceType
-case object Queen extends PieceType
-case object Rook extends PieceType
-case object Knight extends PieceType
-case object Bishop extends PieceType
-
-
-case class ChessPiece(color: Color, pieceType: PieceType, id: Int)
-
-
-case class Position(row: Int, column: Int)
-
-
-sealed abstract class ChessMove
-case class RegularChessMove(origin: Position, destination: Position) extends ChessMove
-case class Castling(kingPosition: Position, rookPosition: Position) extends ChessMove
-case class Promotion(origin: Position, promoted: PieceType, destination: Position) extends ChessMove
-case class EnPassant(origin: Position, destination: Position) extends ChessMove
+// scalastyle:off cyclomatic.complexity
+// scalastyle:off method.length
+// scalastyle:off magic.number
+// scalastyle:off return
 
 case class ChessState(
                        currentPlayer: Int,
@@ -57,8 +28,6 @@ case class ChessState(
   type Move = ChessMove
 
   private def getPiece(pos: Position): Option[ChessPiece] = board(pos.row)(pos.column)
-
-  // scalastyle:off
 
   override def apply(move: ChessMove): ChessState = {
 
@@ -116,7 +85,9 @@ case class ChessState(
             if(abs(origin.row - destination.row) == 2) {
               val dir = if(piece.color == White) 1 else -1
               Some(Position(destination.row - dir, destination.column))
-            } else None
+            } else {
+              None
+            }
           case _ => None
         }
 
@@ -164,7 +135,9 @@ case class ChessState(
           newCastlingRights(king.color.id)(0) = false
           newCastlingRights(king.color.id)(1) = false
 
-        } else throw new IllegalArgumentException(s"castling: rook is positioned on a bad column (${rookPos.column})")
+        } else {
+          throw new IllegalArgumentException(s"castling: rook is positioned on a bad column (${rookPos.column})")
+        }
       }
 
       case Promotion(origin, promoted, destination) => {
@@ -231,7 +204,9 @@ case class ChessState(
         // en passant is missing
       }
       case Rook => {
-        if(dx != 0 && dy != 0) false
+        if(dx != 0 && dy != 0) {
+          false
+        }
         else if(dy == 0) {
           (1 until abs(dx)).forall(d => board(pos.row + dir_x * d)(pos.column).isEmpty)
         } else {
@@ -240,7 +215,9 @@ case class ChessState(
       }
       case Knight => (abs(dx) == 2 && abs(dy) == 1) || (abs(dx) == 1 && abs(dy) == 2)
       case Bishop => {
-        if(abs(dx) != abs(dy)) false
+        if(abs(dx) != abs(dy)) {
+          false
+        }
         else {
           (1 until abs(dx)).forall(d => board(pos.row + dir_x * d)(pos.column + dir_y * d).isEmpty)
         }
@@ -252,7 +229,9 @@ case class ChessState(
           (1 until abs(dy)).forall(d => board(pos.row)(pos.column + dir_y * d).isEmpty)
         } else if(abs(dx) == abs(dy)) {
           (1 until abs(dx)).forall(d => board(pos.row + dir_x * d)(pos.column + dir_y * d).isEmpty)
-        } else false
+        } else {
+          false
+        }
       }
       case King => abs(dx) <= 1 && abs(dy) <= 1
     }
@@ -313,7 +292,9 @@ case class ChessState(
             case _ => false
           }
         }
-      } else false
+      } else {
+        false
+      }
     }
 
     for(d <- -1 to 1 by 2) {
@@ -537,8 +518,12 @@ case class ChessState(
           case None => representation ++= " "
           case Some(piece) =>
             val code = pieceLetter(piece.pieceType)
-            if (piece.color == White) representation ++= code.capitalize
-            else representation ++= code
+            if (piece.color == White) {
+              representation ++= code.capitalize
+            }
+            else {
+              representation ++= code
+            }
         }
       }
       representation ++= s"|${y + 1}\n"
@@ -632,7 +617,7 @@ object ChessState {
 
     val positions: Seq[(ChessPiece, Position)] = for(
       (seq, row) <- board.zipWithIndex;
-      (pieceOption, column) <- board(row).zipWithIndex;
+      (pieceOption, column) <- seq.zipWithIndex;
       piece <- pieceOption.toSeq
     ) yield piece -> Position(row, column)
 

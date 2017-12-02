@@ -5,12 +5,6 @@ import squire.base.State
 import scala.io.BufferedSource
 
 package object chess {
-  def time[R](block: => R): (R, Double) = {
-    val t0 = System.nanoTime()
-    val result = block    // call-by-name
-    val t1 = System.nanoTime()
-    (result, (t1 - t0) / 1e6)
-  }
 
   def countMoves[S <: State[S]](state: State[S], depth: Int): Int = depth match {
 
