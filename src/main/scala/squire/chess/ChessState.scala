@@ -534,22 +534,96 @@ case class ChessState(
     representation.result()
   }
 
+  def decodeAlgebraicNotationMove(code: String): Option[ChessMove] = code.length match {
+    case 4 => { // anything but promotion
+      for {
+        source <- ChessState.decodeAlgebraicNotationPosition(code.slice(0,2))
+        destination <- ChessState.decodeAlgebraicNotationPosition(code.slice(2,4))
+        piece <- getPiece(source)
+      } yield {
+
+        val d_row = destination.row - source.row
+        val d_col = destination.column - source.column
+
+        if ((piece.pieceType == King || piece.pieceType == King) && abs(d_col) == 2) {
+          Castling(source, Position(destination.row, if (d_col > 0) 7 else 0))
+        } else if (piece.pieceType == Pawn && abs(d_col) > 0 && getPiece(destination).isEmpty) {
+          EnPassant(source, destination)
+        } else {
+          RegularChessMove(source, destination)
+        }
+
+      }
+    }
+    case 5 => { // promotion
+      for {
+        source <- ChessState.decodeAlgebraicNotationPosition(code.slice(0,2))
+        destination <- ChessState.decodeAlgebraicNotationPosition(code.slice(2,4))
+        pieceType <- ChessState.decodeAlgebraicNotationPiece(code(4))
+      } yield Promotion(source, pieceType, destination)
+    }
+    case _ => None
+  }
+
+  def encodeAlgebraicNotationMove(move: ChessMove): String = move match {
+    case RegularChessMove(src, dest) =>
+      ChessState.encodeAlgebraicNotationPosition(src) + ChessState.encodeAlgebraicNotationPosition(dest)
+    case Promotion(src, promoted, dest) =>
+      (ChessState.encodeAlgebraicNotationPosition(src)
+        + ChessState.encodeAlgebraicNotationPosition(dest)
+        + ChessState.encodeAlgebraicNotationPiece(promoted)
+        )
+    case Castling(kingPos, rookPos) =>
+      if(rookPos.column > kingPos.column) {
+        (ChessState.encodeAlgebraicNotationPosition(kingPos)
+          + ChessState.encodeAlgebraicNotationPosition(Position(kingPos.row, kingPos.column + 2))
+          )
+      }
+      else {
+        (ChessState.encodeAlgebraicNotationPosition(kingPos)
+          + ChessState.encodeAlgebraicNotationPosition(Position(kingPos.row, kingPos.column - 2))
+          )
+      }
+    case EnPassant(src, dest) =>
+      ChessState.encodeAlgebraicNotationPosition(src) + ChessState.encodeAlgebraicNotationPosition(dest)
+  }
+
 }
 
 object ChessState {
 
   def apply(): ChessState = parseFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 
+  private val pattern: Regex = """([a-h])([1-8])""".r
+
+  def decodeAlgebraicNotationPosition(code: String): Option[Position] = code match {
+    case pattern(col_str, row_str) => Some(Position(row_str.charAt(0) - '1', col_str.charAt(0) - 'a'))
+    case _ => None
+  }
+
+  def encodeAlgebraicNotationPosition(position: Position): String =
+    ('a' + position.column).toChar.toString + (1 + position.row).toString
+
+  def decodeAlgebraicNotationPiece(c: Char): Option[PieceType] = c match {
+    case 'r' => Some(Rook)
+    case 'n' => Some(Knight)
+    case 'b' => Some(Bishop)
+    case 'q' => Some(Queen)
+    case 'k' => Some(King)
+    case 'p' => Some(Pawn)
+    case _ => None
+  }
+
+  def encodeAlgebraicNotationPiece(p: PieceType): Char = p match {
+    case Rook => 'r'
+    case Knight => 'n'
+    case Bishop => 'b'
+    case Queen => 'q'
+    case King => 'k'
+    case Pawn => 'p'
+  }
+
   def parseFen(code: String): ChessState = {
-
-    val pattern: Regex = """([a-h])([1-8])""".r
-
-    def decodeAlgebraicNotation(code: String): Option[Position] = code match {
-      case pattern(col_str, row_str) => Some(Position(row_str.charAt(0) - '1', col_str.charAt(0) - 'a'))
-      case _ => None
-    }
-
-    def encodeAlgebraicNotation(position: Position): String = ('a' + position.column).toChar.toString + (1 + position.row).toString
 
     def addPiece(board: Array[Array[Option[ChessPiece]]], piece: ChessPiece, pos: Position): Unit = {
       board(pos.row)(pos.column) = Some(piece)
@@ -609,7 +683,7 @@ object ChessState {
     // parse en passant marker
     val enPassantPosition = words(3) match {
       case "-" => None
-      case s => decodeAlgebraicNotation(s)
+      case s => decodeAlgebraicNotationPosition(s)
     }
 
     // parse turn

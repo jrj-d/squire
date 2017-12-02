@@ -1,12 +1,10 @@
 package squire.agents.minimax
 
-import com.typesafe.scalalogging.Logger
+import com.typesafe.scalalogging.LazyLogging
 import squire.base.{Agent, Finished, Playing, State}
 import squire.utils.time
 
-class NegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends Agent[S] {
-
-  val logger = Logger("NegamaxAgent")
+class NegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends Agent[S] with LazyLogging {
 
   def play(state: S): S#Move = findBestMove(state, maxDepth)
 

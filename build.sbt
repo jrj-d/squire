@@ -11,10 +11,11 @@ libraryDependencies  ++= Seq(
             // native libraries greatly improve performance, but increase jar sizes.
             "org.scalanlp" %% "breeze-natives" % "0.13.2",
             "org.scalatest" % "scalatest_2.12" % "3.0.4" % "test",
+            "ch.qos.logback" % "logback-classic" % "1.1.3",
             "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
-            "org.typelevel" %% "cats-core" % "1.0.0-RC1"
-
-
+            "org.typelevel" %% "cats-core" % "1.0.0-RC1",
+            "com.typesafe.akka" %% "akka-actor" % "2.5.7",
+            "com.typesafe.akka" %% "akka-slf4j" % "2.5.7"
 )
 
 resolvers ++= Seq(
