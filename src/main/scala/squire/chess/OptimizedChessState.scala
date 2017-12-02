@@ -4,7 +4,7 @@ import squire.base.{Evaluation, Finished, Playing, State}
 
 import scala.collection.immutable.{Map => ImmutableMap}
 import scala.collection.mutable
-import scala.collection.mutable.{IndexedSeq => MutableIndexedSeq, Map => MutableMap}
+import scala.collection.mutable.{ListBuffer, IndexedSeq => MutableIndexedSeq, Map => MutableMap}
 import scala.math.abs
 import scala.util.matching.Regex
 
@@ -255,21 +255,24 @@ case class OptimizedChessState(
     // the rest
     def moveInDirection(dx: Int, dy: Int) = {
       val Position(x, y) = position
-      val (threatX, threatY) = Stream.from(1).map(m => (x + m * dx, y + m * dy)).dropWhile { case (newX, newY) =>
-        withinBoard(newX) && withinBoard(newY) && board(newX)(newY).isEmpty
-      }.head
+      var m = 1 // this solution with while is faster than a Stream(...).dropWhile(...).... solution
+      while(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy).isEmpty) {
+        m += 1
+      }
+      val threatX = x + m * dx
+      val threatY = y + m * dy
 
       if(withinBoard(threatX) && withinBoard(threatY) && board(threatX)(threatY).get.color != color) {
         val piece = board(threatX)(threatY).get
         if(dx == 0 || dy == 0) {
           piece.pieceType match {
-            case King => abs(threatX - x) <= 1 && abs(threatY - y) <= 1
+            case King => m == 1
             case Queen | Rook => true
             case _ => false
           }
         } else {
           piece.pieceType match {
-            case King => abs(threatX - x) <= 1 && abs(threatY - y) <= 1
+            case King => m == 1
             case Queen | Bishop => true
             case _ => false
           }
@@ -301,23 +304,20 @@ case class OptimizedChessState(
 
     def moveInDirection(piece: ChessPiece, init: Position, dx: Int, dy: Int): Seq[ChessMove] = {
 
+      // this solution with while is faster than the immutable counterpart
+
+      val output = ListBuffer.empty[ChessMove]
+      var m = 1
       val Position(x, y) = init
-
-      val emptyPositions: Seq[Position] = Stream.from(1).map(m => Position(x + m * dx, y + m * dy)).takeWhile { p =>
-        withinBoard(p.row) && withinBoard(p.column) && board(p.row)(p.column).isEmpty
+      while(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy).isEmpty) {
+        output += RegularChessMove(init, Position(x + m * dx, y + m * dy))
+        m += 1
+      }
+      if(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy).get.color != piece.color) {
+        output += RegularChessMove(init, Position(x + m * dx, y + m * dy))
       }
 
-      val nextM = emptyPositions.length + 1
-      val nextX = x + nextM * dx
-      val nextY = y + nextM * dy
-
-      val positions = if(withinBoard(nextX) && withinBoard(nextY) && board(nextX)(nextY).get.color != piece.color) {
-        emptyPositions :+ Position(nextX, nextY)
-      } else {
-        emptyPositions
-      }
-
-      positions.map(RegularChessMove(init, _))
+      output.result()
     }
 
     val moves = Seq.newBuilder[ChessMove]

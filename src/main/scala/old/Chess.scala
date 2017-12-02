@@ -222,7 +222,7 @@ class ChessState(val turn: Int, val board: Array[Array[ChessPiece]], val positio
         // pawns
         val dir = if(color == White) 1 else -1
         if(withinBoard(position.row + dir)) {
-            for(dx <- -1 to 1 by 2) {
+            for(dx  <- -1 to 1 by 2) {
                 if(withinBoard(position.column + dx)) {
                     val piece = board(position.row + dir)(position.column + dx)
                     piece match {
