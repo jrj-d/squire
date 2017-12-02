@@ -3,36 +3,6 @@ package squire.chess
 import scala.io.{BufferedSource, Source}
 import org.scalatest.FunSpec
 
-case class MoveCount(
-                      leaves: Long,
-                      enPassant: Long,
-                      castling: Long,
-                      promotion: Long,
-                      check: Long,
-                      checkMate: Long) {
-
-  def +(c: MoveCount): MoveCount = MoveCount(
-    this.leaves + c.leaves,
-    this.enPassant + c.enPassant,
-    this.castling + c.castling,
-    this.promotion + c.promotion,
-    this.check + c.check,
-    this.checkMate + c.checkMate
-  )
-}
-
-object MoveCount {
-
-  def fromSeq(l: Seq[Long]): MoveCount = MoveCount(l(0), l(1), l(2), l(3), l(4), l(5))
-
-  def empty: MoveCount = MoveCount(0, 0, 0, 0, 0, 0)
-  def enPassant: MoveCount = MoveCount(1, 1, 0, 0, 0, 0)
-  def castling: MoveCount = MoveCount(1, 0, 1, 0, 0, 0)
-  def promotion: MoveCount = MoveCount(1, 0, 0, 1, 0, 0)
-  def regular: MoveCount = MoveCount(1, 0, 0, 0, 0, 0)
-  def check: MoveCount = MoveCount(0, 0, 0, 0, 1, 0)
-  def checkMate: MoveCount = MoveCount(0, 0, 0, 0, 1, 1)
-}
 
 trait PerftBehaviors { this: FunSpec =>
 
@@ -99,16 +69,14 @@ trait PerftBehaviors { this: FunSpec =>
   }
 }
 
-class Perft extends FunSpec with PerftBehaviors {
+class PerftTest extends FunSpec with PerftBehaviors {
 
-  val perfts: BufferedSource = Source.fromURL(getClass.getResource("/perfts.fen"))
+  val source: BufferedSource = Source.fromURL(getClass.getResource("/perfts.fen"))
+  val perfts: Seq[Perft] = readPerftFile(source).toList
 
-  for(perft <- perfts.getLines if !perft.startsWith("#")) {
-    val words = perft.split(" ")
-    val fen = words.slice(0, 6).reduceLeft(_ + " " + _)
-    val depth = words(6).toInt
-    val moveCount = MoveCount.fromSeq(words.slice(7, 13).map(_.toLong))
-    val initState = ChessState.parseFen(fen)
+  for(perft <- perfts) {
+
+    val initState = ChessState.parseFen(perft.fen)
     val alternateState = new ChessState(initState.currentPlayer, initState.board, initState.positions, initState.castlingRights, initState.enPassantPosition) {
       override def isInCheck(color: Color): Boolean = {
         val kingPosition = positions(ChessPiece(color, King, 0))
@@ -116,12 +84,12 @@ class Perft extends FunSpec with PerftBehaviors {
       }
     }
 
-    describe("From " + fen + " at depth " + depth + ", the engine") {
-      it should behave like perftTestedEngine(initState, depth, moveCount)
+    describe("From " + perft.fen + " at depth " + perft.depth + ", the engine") {
+      it should behave like perftTestedEngine(initState, perft.depth, perft.moveCount)
     }
 
-    describe("From " + fen + " at depth " + depth + ", the alternate engine using method threatens()") {
-      it should behave like perftTestedEngine(alternateState, depth, moveCount)
+    describe("From " + perft.fen + " at depth " + perft.depth + ", the alternate engine using method threatens()") {
+      it should behave like perftTestedEngine(alternateState, perft.depth, perft.moveCount)
     }
   }
 

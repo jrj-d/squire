@@ -4,10 +4,9 @@ import squire.base.{Evaluation, Finished, Playing, State}
 
 import scala.collection.immutable.{Map => ImmutableMap}
 import scala.collection.mutable
-import scala.collection.mutable.{IndexedSeq => MutableIndexedSeq, Map => MutableMap}
+import scala.collection.mutable.{ListBuffer, Map => MutableMap}
 import scala.math.abs
 import scala.util.matching.Regex
-
 
 sealed abstract class Color(val id: Int) {
   def opponent: Color = this match {
@@ -47,12 +46,11 @@ case class Castling(kingPosition: Position, rookPosition: Position) extends Ches
 case class Promotion(origin: Position, promoted: PieceType, destination: Position) extends ChessMove
 case class EnPassant(origin: Position, destination: Position) extends ChessMove
 
-
 case class ChessState(
                        currentPlayer: Int,
-                       board: IndexedSeq[IndexedSeq[Option[ChessPiece]]],
+                       board: Array[Array[Option[ChessPiece]]],
                        positions: ImmutableMap[ChessPiece, Position],
-                       castlingRights: ImmutableMap[Color, IndexedSeq[Boolean]],
+                       castlingRights: Array[Array[Boolean]],
                        enPassantPosition: Option[Position]
                      ) extends State[ChessState] {
 
@@ -71,10 +69,10 @@ case class ChessState(
     // The expected behavior is: throw an exception if the move is not valid.
     // That's why there are some unsafe pieces of code.
 
-    val newBoard = MutableIndexedSeq(board.map(row => MutableIndexedSeq(row:_*)):_*)
-    val newCastlingRights = MutableMap(castlingRights.mapValues(row => MutableIndexedSeq(row:_*)).toSeq:_*)
-    val newPositions = MutableMap(positions.toSeq:_*)
+    val newBoard = board.map(_.clone)
+    val newCastlingRights = castlingRights.map(_.clone)
     var newEnPassantPosition: Option[Position] = None
+    var newPositions: ImmutableMap[ChessPiece, Position] = Map.empty[ChessPiece, Position]
 
     move match {
 
@@ -82,32 +80,33 @@ case class ChessState(
 
         val piece = getPiece(origin).get // fail if no moved piece
 
-        // remove deleted piece if needed
         val deletedPieceOption = getPiece(destination)
-        deletedPieceOption.foreach { deletedPiece =>
-          if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
-          newPositions -= deletedPiece
+        deletedPieceOption match {
+          case Some(deletedPiece) =>
+            if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
+            newPositions = positions + (piece -> destination) - deletedPiece
+          case None =>
+            newPositions = positions + (piece -> destination)
         }
 
         // move piece
         newBoard(destination.row)(destination.column) = Some(piece)
         newBoard(origin.row)(origin.column) = None
-        newPositions(piece) = destination
 
         // handle castling rights
         piece.pieceType match {
           case King =>
-            newCastlingRights(piece.color)(0) = false
-            newCastlingRights(piece.color)(1) = false
+            newCastlingRights(piece.color.id)(0) = false
+            newCastlingRights(piece.color.id)(1) = false
           case Rook =>
-            newCastlingRights(piece.color)(piece.id) = false
+            newCastlingRights(piece.color.id)(piece.id) = false
           case _ => ()
         }
 
         // handle castling rights if a rook is captured
         deletedPieceOption.foreach { deletedPiece =>
           if (deletedPiece.pieceType == Rook & deletedPiece.id <= 1) {
-            newCastlingRights(deletedPiece.color)(deletedPiece.id) = false
+            newCastlingRights(deletedPiece.color.id)(deletedPiece.id) = false
           }
         }
 
@@ -146,11 +145,10 @@ case class ChessState(
 
           newBoard(row)(3) = Some(rook)
           newBoard(row)(2) = Some(king)
-          newPositions(rook) = Position(row, 3)
-          newPositions(king) = Position(row, 2)
+          newPositions = positions + (rook -> Position(row, 3)) + (king -> Position(row, 2))
 
-          newCastlingRights(king.color)(0) = false
-          newCastlingRights(king.color)(1) = false
+          newCastlingRights(king.color.id)(0) = false
+          newCastlingRights(king.color.id)(1) = false
 
         } else if(rookPos.column == 7) {
 
@@ -161,11 +159,10 @@ case class ChessState(
 
           newBoard(row)(5) = Some(rook)
           newBoard(row)(6) = Some(king)
-          newPositions(rook) = Position(row, 5)
-          newPositions(king) = Position(row, 6)
+          newPositions = positions + (rook -> Position(row, 5)) + (king -> Position(row, 6))
 
-          newCastlingRights(king.color)(0) = false
-          newCastlingRights(king.color)(1) = false
+          newCastlingRights(king.color.id)(0) = false
+          newCastlingRights(king.color.id)(1) = false
 
         } else throw new IllegalArgumentException(s"castling: rook is positioned on a bad column (${rookPos.column})")
       }
@@ -175,22 +172,22 @@ case class ChessState(
         val pawn = getPiece(origin).get // fail if no piece
         if(pawn.pieceType != Pawn) throw new IllegalArgumentException("promotion: piece is not a pawn")
 
-        // remove deleted piece if needed
-        val deletedPieceOption = getPiece(destination)
-        deletedPieceOption.foreach { deletedPiece =>
-          if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
-          newPositions -= deletedPiece
-        }
-
         val newPiece = promoted match {
           case t @ (Rook | Knight | Bishop | Queen) => ChessPiece(pawn.color, t, 8 + pawn.id) // just to be sure in case of perft
           case t => throw new IllegalArgumentException(s"cannot promote pawn to $t")
         }
 
+        val deletedPieceOption = getPiece(destination)
+        deletedPieceOption match {
+          case Some(deletedPiece) =>
+            if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
+            newPositions = positions + (newPiece -> destination) - deletedPiece - pawn
+          case None =>
+            newPositions = positions + (newPiece -> destination) - pawn
+        }
+
         newBoard(origin.row)(origin.column) = None
         newBoard(destination.row)(destination.column) = Some(newPiece)
-        newPositions -= pawn
-        newPositions(newPiece) = destination
       }
 
       case EnPassant(origin, destination) => {
@@ -201,16 +198,15 @@ case class ChessState(
         newBoard(destination.row)(destination.column) = Some(piece)
         newBoard(origin.row)(destination.column) = None
         newBoard(origin.row)(origin.column) = None
-        newPositions(piece) = destination
-        newPositions -= deletedPiece
+        newPositions = positions + (piece -> destination) - deletedPiece
       }
     }
 
     ChessState(
       (currentPlayer + 1) % 2,
-      IndexedSeq(newBoard.map(row => IndexedSeq(row:_*)):_*),
-      ImmutableMap(newPositions.toSeq:_*),
-      ImmutableMap(newCastlingRights.mapValues(row => IndexedSeq(row:_*)).toSeq:_*),
+      newBoard,
+      newPositions,
+      newCastlingRights,
       newEnPassantPosition
     )
 
@@ -295,21 +291,24 @@ case class ChessState(
     // the rest
     def moveInDirection(dx: Int, dy: Int) = {
       val Position(x, y) = position
-      val (threatX, threatY) = Stream.from(1).map(m => (x + m * dx, y + m * dy)).dropWhile { case (newX, newY) =>
-        withinBoard(newX) && withinBoard(newY) && board(newX)(newY).isEmpty
-      }.head
+      var m = 1 // this solution with while is faster than a Stream(...).dropWhile(...).... solution
+      while(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy).isEmpty) {
+        m += 1
+      }
+      val threatX = x + m * dx
+      val threatY = y + m * dy
 
       if(withinBoard(threatX) && withinBoard(threatY) && board(threatX)(threatY).get.color != color) {
         val piece = board(threatX)(threatY).get
         if(dx == 0 || dy == 0) {
           piece.pieceType match {
-            case King => abs(threatX - x) <= 1 && abs(threatY - y) <= 1
+            case King => m == 1
             case Queen | Rook => true
             case _ => false
           }
         } else {
           piece.pieceType match {
-            case King => abs(threatX - x) <= 1 && abs(threatY - y) <= 1
+            case King => m == 1
             case Queen | Bishop => true
             case _ => false
           }
@@ -341,23 +340,20 @@ case class ChessState(
 
     def moveInDirection(piece: ChessPiece, init: Position, dx: Int, dy: Int): Seq[ChessMove] = {
 
+      // this solution with while is faster than the immutable counterpart
+
+      val output = ListBuffer.empty[ChessMove]
+      var m = 1
       val Position(x, y) = init
-
-      val emptyPositions: Seq[Position] = Stream.from(1).map(m => Position(x + m * dx, y + m * dy)).takeWhile { p =>
-        withinBoard(p.row) && withinBoard(p.column) && board(p.row)(p.column).isEmpty
+      while(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy).isEmpty) {
+        output += RegularChessMove(init, Position(x + m * dx, y + m * dy))
+        m += 1
+      }
+      if(withinBoard(x + m * dx) && withinBoard(y + m * dy) && board(x + m * dx)(y + m * dy).get.color != piece.color) {
+        output += RegularChessMove(init, Position(x + m * dx, y + m * dy))
       }
 
-      val nextM = emptyPositions.length + 1
-      val nextX = x + nextM * dx
-      val nextY = y + nextM * dy
-
-      val positions = if(withinBoard(nextX) && withinBoard(nextY) && board(nextX)(nextY).get.color != piece.color) {
-        emptyPositions :+ Position(nextX, nextY)
-      } else {
-        emptyPositions
-      }
-
-      positions.map(RegularChessMove(init, _))
+      output.result()
     }
 
     val moves = Seq.newBuilder[ChessMove]
@@ -481,13 +477,12 @@ case class ChessState(
 
     // castling
     val row = if(color == White) 0 else 7
-    val color_code = if(color == White) 0 else 1
-    if(castlingRights(color)(0) && (1 to 3).forall(board(row)(_).isEmpty)) {
+    if(castlingRights(color.id)(0) && (1 to 3).forall(board(row)(_).isEmpty)) {
       if(!isInCheck(color) && !isThreatened(Position(row, 3), color)) {
         specialMoves += Castling(Position(row, 4), Position(row, 0))
       }
     }
-    if(castlingRights(color)(1) && (5 to 6).forall(board(row)(_).isEmpty)) {
+    if(castlingRights(color.id)(1) && (5 to 6).forall(board(row)(_).isEmpty)) {
       if(!isInCheck(color) && !isThreatened(Position(row, 5), color)) {
         specialMoves += Castling(Position(row, 4), Position(row, 7))
       }
@@ -571,18 +566,15 @@ object ChessState {
 
     def encodeAlgebraicNotation(position: Position): String = ('a' + position.column).toChar.toString + (1 + position.row).toString
 
-    def addPiece(board: MutableIndexedSeq[MutableIndexedSeq[Option[ChessPiece]]], piece: ChessPiece, pos: Position): Unit = {
+    def addPiece(board: Array[Array[Option[ChessPiece]]], piece: ChessPiece, pos: Position): Unit = {
       board(pos.row)(pos.column) = Some(piece)
     }
 
     val words = code.split(" ")
     if(words.length != 6) throw new IllegalArgumentException("Fen: wrong number of fields")
 
-    val castlingRights: MutableMap[Color, MutableIndexedSeq[Boolean]] = MutableMap(
-      White -> MutableIndexedSeq.fill(2)(false),
-      Black -> MutableIndexedSeq.fill(2)(false)
-    )
-    val board = MutableIndexedSeq.fill(8)(MutableIndexedSeq.fill[Option[ChessPiece]](8)(None))
+    val castlingRights = Array.fill(2)(Array.fill(2)(false))
+    val board = Array.fill(8)(Array.fill[Option[ChessPiece]](8)(None))
 
     // parse board description
     var row = 7
@@ -620,10 +612,10 @@ object ChessState {
     // parse castling rights
     for(c <- words(2)) {
       c match {
-        case 'Q' => castlingRights(White)(0) = true
-        case 'K' => castlingRights(White)(1) = true
-        case 'q' => castlingRights(Black)(0) = true
-        case 'k' => castlingRights(Black)(1) = true
+        case 'Q' => castlingRights(White.id)(0) = true
+        case 'K' => castlingRights(White.id)(1) = true
+        case 'q' => castlingRights(Black.id)(0) = true
+        case 'k' => castlingRights(Black.id)(1) = true
         case '-' => ()
         case _ => throw new IllegalArgumentException("Fen: did not understand castling rights")
       }
@@ -646,9 +638,9 @@ object ChessState {
 
     ChessState(
       turn % 2,
-      IndexedSeq(board.map(row => IndexedSeq(row:_*)):_*),
-      ImmutableMap(positions.toSeq:_*),
-      ImmutableMap(castlingRights.mapValues(row => IndexedSeq(row:_*)).toSeq:_*),
+      board,
+      positions.toMap,
+      castlingRights,
       enPassantPosition
     )
   }
