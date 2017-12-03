@@ -71,7 +71,7 @@ trait PerftBehaviors { this: FunSpec =>
 
 class PerftTest extends FunSpec with PerftBehaviors {
 
-  val source: BufferedSource = Source.fromURL(getClass.getResource("/perfts.fen"))
+  val source: BufferedSource = Source.fromURL(getClass.getResource("/perfts-for-rules.fen"))
   val perfts: Seq[Perft] = readPerftFile(source).toList
 
   for(perft <- perfts) {

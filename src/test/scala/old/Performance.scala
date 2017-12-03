@@ -27,7 +27,7 @@ object Performance {
   }
 
   def main(args: Array[String]): Unit = {
-    val perfts: BufferedSource = Source.fromURL(getClass.getResource("/perfts.fen"))
+    val perfts: BufferedSource = Source.fromURL(getClass.getResource("/perfts-for-rules.fen"))
 
     for(perft <- perfts.getLines if !perft.startsWith("#")) {
       val words = perft.split(" ")

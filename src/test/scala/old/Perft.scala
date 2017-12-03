@@ -87,7 +87,7 @@ trait PerftBehaviors { this: FunSpec =>
 
 class Perft extends FunSpec with PerftBehaviors {
 
-	val perfts = Source.fromURL(getClass.getResource("/perfts.fen"))
+	val perfts = Source.fromURL(getClass.getResource("/perfts-for-rules.fen"))
 
 	for(perft <- perfts.getLines if !perft.startsWith("#")) {
 		val words = perft.split(" ")

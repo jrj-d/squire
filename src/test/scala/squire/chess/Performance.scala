@@ -56,7 +56,7 @@ object Performance {
 
   def main(args: Array[String]): Unit = {
 
-    val source: BufferedSource = Source.fromURL(getClass.getResource("/perfts.fen"))
+    val source: BufferedSource = Source.fromURL(getClass.getResource("/perfts-for-rules.fen"))
     val perfts: Seq[Perft] = readPerftFile(source).toList
 
     val programs = ListMap[String, String => (State[S] forSome {type S <: State[S]})](

@@ -12,7 +12,7 @@ object Main extends App {
   // default Actor constructor
   val agent: Agent[ChessState] = new TimeLimitedAgent(
     (depth: Int) => new AlphaBetaNegamaxAgent(tradeValue, depth),
-    1 to 6,
+    1 to 10,
     7500
   )
   //val agent = new NegamaxAgent(tradeValue, 1)

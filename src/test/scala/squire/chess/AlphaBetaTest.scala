@@ -37,7 +37,7 @@ class AlphaBetaTest extends FunSpec {
     }
   }
 
-  val source: BufferedSource = Source.fromURL(getClass.getResource("/perfts.fen"))
+  val source: BufferedSource = Source.fromURL(getClass.getResource("/perfts-for-ab.fen"))
   val perfts: Seq[Perft] = readPerftFile(source).toList
 
   for(perft <- perfts) {
