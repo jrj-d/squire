@@ -1,15 +1,20 @@
 package squire.chess.connectors.xboard
 
-import akka.actor.ActorSystem
+import squire.agents.TimeLimitedAgent
 import squire.agents.minimax.NegamaxAgent
+import squire.base.Agent
+import squire.chess.ChessState
 import squire.chess.heuristics.tradeValue
 
-import scala.io.StdIn.readLine
+// scalastyle:off magic.number
 
 object Main extends App {
-  val system = ActorSystem("XBoardSystem")
   // default Actor constructor
-  val agent = new NegamaxAgent(tradeValue, 3)
-  val engineProcess = system.actorOf(EngineProcess.props(agent), name = "EngineProcess")
-  Stream.continually(readLine()).foreach(engineProcess ! _)
+  val agent: Agent[ChessState] = new TimeLimitedAgent(
+    (depth: Int) => new NegamaxAgent(tradeValue, depth),
+    1 to 4,
+    5000
+  )
+  val engineProcess = new EngineProcess(agent)
+  engineProcess.run()
 }

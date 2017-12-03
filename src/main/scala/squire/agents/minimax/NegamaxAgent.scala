@@ -10,11 +10,12 @@ class NegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends
 
   def findBestMove(state: S, depth: Int): S#Move = {
 
-    val (bestMove, duration) = time(state.possibleMoves
+    val (bestMove, duration) = time {
+      state.possibleMoves
         .map { m => (m, negamax(state.apply(m), depth - 1).invert) }
         .maxBy(_._2)
         ._1
-    )
+    }
 
     logger.info(f"$depth-ply depth evaluated in $duration%1.0f ms. Best move: $bestMove")
 
@@ -22,6 +23,7 @@ class NegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends
   }
 
   def negamax(state: S, depth: Int): Score = {
+    logger.debug(s"Remaining depth is $depth, evaluating\n$state")
     state.evaluate match {
       case Finished(result) => Result(result)
       case Playing =>
