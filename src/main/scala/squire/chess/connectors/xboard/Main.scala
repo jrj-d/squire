@@ -15,6 +15,7 @@ object Main extends App {
     1 to 4,
     5000
   )
+  //val agent = new NegamaxAgent(tradeValue, 1)
   val engineProcess = new EngineProcess(agent)
   engineProcess.run()
 }

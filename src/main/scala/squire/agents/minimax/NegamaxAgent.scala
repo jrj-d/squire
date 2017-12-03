@@ -25,15 +25,22 @@ class NegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends
   def negamax(state: S, depth: Int): Score = {
     logger.debug(s"Remaining depth is $depth, evaluating\n$state")
     state.evaluate match {
-      case Finished(result) => Result(result)
+      case Finished(result) => {
+        logger.debug(s"State is final: $result")
+        Result(result)
+      }
       case Playing =>
         if(depth == 0) {
-          Heuristic(heuristic(state))
+          val value = heuristic(state)
+          logger.debug(s"Heuristic evaluation: $value")
+          Heuristic(value)
         } else {
-          state.possibleMoves
+          val value = state.possibleMoves
             .map(state.apply)
             .map(negamax(_, depth - 1).invert)
             .max
+          logger.debug(s"Minimax evaluation: $value")
+          value
         }
     }
   }

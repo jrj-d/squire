@@ -1,11 +1,13 @@
 package squire.chess
 
-package object heuristics {
+import com.typesafe.scalalogging.LazyLogging
+
+package object heuristics extends LazyLogging {
 
   // scalastyle:off magic.number
   def tradeValue(state: ChessState): Double = {
 
-    val boardValue = state.positions.keys.map { piece =>
+    val boardValue = state.positions.keys.toSeq.map { piece =>
       val value = piece.pieceType match {
         case King => 0
         case Queen => 9
