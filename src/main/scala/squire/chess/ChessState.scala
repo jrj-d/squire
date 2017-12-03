@@ -67,7 +67,7 @@ case class ChessState(
           case King =>
             newCastlingRights(piece.color.id)(0) = false
             newCastlingRights(piece.color.id)(1) = false
-          case Rook =>
+          case Rook if piece.id <= 2 =>
             newCastlingRights(piece.color.id)(piece.id) = false
           case _ => ()
         }

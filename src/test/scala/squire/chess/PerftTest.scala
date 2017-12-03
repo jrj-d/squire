@@ -39,7 +39,7 @@ trait PerftBehaviors { this: FunSpec =>
     }
   }
 
-  def perftTestedEngine(state: ChessState, depth: Int, goal: MoveCount) {
+  def perftTestedEngine(state: ChessState, depth: Int, goal: MoveCount): Unit = {
 
     val result = countMoves(state, depth)
 
