@@ -23,11 +23,10 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
       counters.traversedNodes += 1
       logger.debug(s"Remaining depth is $depth, evaluating\n$state")
       state.evaluate match {
-        case Finished(result) => {
+        case Finished(result) =>
           counters.finalNodes += 1
           logger.debug(s"State is final: $result")
           Result(result)
-        }
         case Playing =>
           if(depth == 0) {
             val value = heuristic(state)

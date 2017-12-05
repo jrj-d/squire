@@ -1,10 +1,6 @@
 package squire.agents.minimax
 
-import com.typesafe.scalalogging.LazyLogging
-import squire.base.{Agent, Finished, Playing, State}
-import squire.utils.time
-
-// scalastyle:off method.length
+import squire.base.State
 
 class OrderedAlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends AlphaBetaNegamaxAgent(heuristic, maxDepth) {
 
