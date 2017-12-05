@@ -10,6 +10,11 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
 
   def play(state: S): S#Move = findBestMove(state, maxDepth)
 
+  def possibleMoves(state: S): Seq[(S#Move, S)] = {
+    val moves = state.possibleMoves
+    moves.zip(moves.map(state.apply))
+  }
+
   def findBestMove(state: S, depth: Int): S#Move = {
 
     val counters = new Counters
@@ -32,11 +37,11 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
           } else {
             var bestValue: Score = Result(Double.MinValue)
             var currentAlpha = alpha
-            var remainingMoves = state.possibleMoves
+            var remainingMoves = possibleMoves(state)
             while(remainingMoves.nonEmpty && currentAlpha < beta) {
-              val move = remainingMoves.head
+              val (_, newState) = remainingMoves.head
               remainingMoves = remainingMoves.tail
-              val currentValue = negamax(state.apply(move), depth - 1, beta.invert, currentAlpha.invert).invert
+              val currentValue = negamax(newState, depth - 1, beta.invert, currentAlpha.invert).invert
               bestValue = if(bestValue > currentValue) bestValue else currentValue
               currentAlpha = if(currentAlpha > currentValue) currentAlpha else currentValue
             }
@@ -48,12 +53,12 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
     }
 
     val (bestMove, duration) = time {
-      val moves = state.possibleMoves
-      var bestMove = moves.head
+      val moves = possibleMoves(state)
+      var bestMove = moves.head._1
       var bestValue: Score = Result(Double.MinValue)
       var currentAlpha: Score = Result(Double.MinValue)
-      for(move <- moves) {
-        val currentValue = negamax(state.apply(move), depth - 1, Result(Double.MinValue), currentAlpha.invert).invert
+      for((move, newState) <- moves) {
+        val currentValue = negamax(newState, depth - 1, Result(Double.MinValue), currentAlpha.invert).invert
         if(currentValue > bestValue) {
           bestValue = currentValue
           bestMove = move

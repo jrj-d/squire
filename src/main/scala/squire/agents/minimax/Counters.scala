@@ -10,6 +10,7 @@ class Counters {
 
   def print(duration: Double): String = {
     val table = Seq(
+      Seq("Metrics", "Value"),
       Seq("duration", duration),
       Seq("nodes per second", 1e3 * traversedNodes / duration),
       Seq("traversed nodes", traversedNodes),

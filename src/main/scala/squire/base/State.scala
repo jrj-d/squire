@@ -8,9 +8,9 @@ trait State[S <: State[S]] { self: S =>
 
   type Move
 
-  def apply(move: Move): S
+  def apply(move: S#Move): S
 
-  def possibleMoves: Seq[Move]
+  def possibleMoves: Seq[S#Move]
 
   def evaluate: Evaluation
 
