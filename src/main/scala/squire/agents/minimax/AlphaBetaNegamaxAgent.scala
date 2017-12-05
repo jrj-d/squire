@@ -12,19 +12,21 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
 
   def findBestMove(state: S, depth: Int): S#Move = {
 
-    var traversedNodeCounter: Int = 0
+    val counters = new Counters
 
     def negamax(state: S, depth: Int, alpha: Score, beta: Score): Score = {
-      traversedNodeCounter += 1
+      counters.traversedNodes += 1
       logger.debug(s"Remaining depth is $depth, evaluating\n$state")
       state.evaluate match {
         case Finished(result) => {
+          counters.finalNodes += 1
           logger.debug(s"State is final: $result")
           Result(result)
         }
         case Playing =>
           if(depth == 0) {
             val value = heuristic(state)
+            counters.evaluatedHeuristics += 1
             logger.debug(s"Heuristic evaluation: $value")
             Heuristic(value)
           } else {
@@ -38,6 +40,7 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
               bestValue = if(bestValue > currentValue) bestValue else currentValue
               currentAlpha = if(currentAlpha > currentValue) currentAlpha else currentValue
             }
+            if(remainingMoves.nonEmpty) counters.betaCutoffs += 1
             logger.debug(s"Alpha-beta pruned minimax evaluation: $bestValue")
             bestValue
           }
@@ -60,8 +63,8 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
       bestMove
     }
 
-    logger.info(f"$depth-ply depth evaluated in $duration%1.0f ms. Best move: $bestMove")
-    logger.info(f"$traversedNodeCounter states evaluated, making ${1e3 * traversedNodeCounter / duration}%1.0f nodes/s")
+    logger.info(f"Best move at $depth-ply depth is $bestMove")
+    logger.info(s"\n${counters.print(duration)}")
 
     bestMove
   }

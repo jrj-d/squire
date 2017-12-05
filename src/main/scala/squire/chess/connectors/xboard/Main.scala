@@ -1,7 +1,7 @@
 package squire.chess.connectors.xboard
 
 import squire.agents.TimeLimitedAgent
-import squire.agents.minimax.{AlphaBetaNegamaxAgent, NegamaxAgent}
+import squire.agents.minimax.AlphaBetaNegamaxAgent
 import squire.base.Agent
 import squire.chess.ChessState
 import squire.chess.heuristics.tradeValue
@@ -11,7 +11,7 @@ import squire.chess.heuristics.tradeValue
 object Main extends App {
   // default Actor constructor
   val agent: Agent[ChessState] = new TimeLimitedAgent(
-    (depth: Int) => new AlphaBetaNegamaxAgent(tradeValue, depth),
+    (depth: Int) => new AlphaBetaNegamaxAgent[ChessState](tradeValue, depth),
     1 to 10,
     7500
   )
