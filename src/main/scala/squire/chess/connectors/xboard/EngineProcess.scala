@@ -1,19 +1,92 @@
 package squire.chess.connectors.xboard
 
 import com.typesafe.scalalogging.LazyLogging
+import squire.agents.TimeLimitedAgent
+import squire.agents.minimax.{AlphaBetaNegamaxAgent, NegamaxAgent, OrderedAlphaBetaNegamaxAgent}
 import squire.base.Agent
 import squire.chess.ChessState
+import squire.chess.heuristics._
 
 import scala.io.StdIn.readLine
 
 // scalastyle:off cyclomatic.complexity
 // scalastyle:off method.length
+// scalastyle:off magic.number
 
-class EngineProcess(val agent: Agent[ChessState]) extends LazyLogging {
+object Option extends Enumeration {
+  type Option = Value
+
+  val ModelType     = Value("Model type")
+  val HeuristicType = Value("Heuristic type")
+}
+
+object ModelType extends Enumeration {
+  type ModelType = Value
+
+  val Negamax       = Value("negamax")
+  val AlphaBeta     = Value("alpha-beta pruning")
+  val MovesOdering  = Value("alpha-beta pruning + moves ordering")
+  //val Quiescence    = Value("alpha-beta pruning + moves ordering + quiescence search")
+}
+
+object HeuristicType extends Enumeration {
+  type HeuristicType = Value
+
+  val TradeValue  = Value("trade value")
+  val Michniewski = Value("michniewski")
+}
+
+class EngineProcess extends LazyLogging {
 
   var forced = false
   var state = ChessState()
-  var timePerMove = 0.0
+  var timePerMove: Double = 7500
+  var modelType: ModelType.Value = ModelType.MovesOdering
+  var heuristicType: HeuristicType.Value = HeuristicType.Michniewski
+  var maxDepth = 100
+  var agent: Agent[ChessState] = _
+
+  def setAgent(): Unit = {
+    val heuristic: ChessState => Double = heuristicType match {
+      case HeuristicType.TradeValue => tradeValue
+      case HeuristicType.Michniewski => michniewski
+    }
+    val baseAgent: Int => Agent[ChessState] =
+      modelType match {
+        case ModelType.MovesOdering =>
+          (d: Int) => new OrderedAlphaBetaNegamaxAgent[ChessState](heuristic, d)
+        case ModelType.AlphaBeta =>
+          (d: Int) => new AlphaBetaNegamaxAgent[ChessState](heuristic, d)
+        case ModelType.Negamax =>
+          (d: Int) => new NegamaxAgent[ChessState](heuristic, d)
+      }
+    agent = new TimeLimitedAgent(
+      baseAgent,
+      1 to maxDepth,
+      timePerMove.toLong
+    )
+    logger.info(s"Setting agent with model '$modelType', heuristic '$heuristicType', max depth $maxDepth, time per move $timePerMove ms")
+  }
+
+  def features: Seq[String] = {
+    val modelChoices = ModelType.values.toSeq.mkString(" /// ")
+    val modelTypeString = s"""feature option="${Option.ModelType} -combo $modelChoices""""
+    val heuristicChoices = HeuristicType.values.toSeq.mkString(" /// ")
+    val heuristicTypeString = s"""feature option="${Option.HeuristicType} -combo $heuristicChoices""""
+    Seq(
+      "feature done=0",
+      "feature myname=\"Squire\"",
+      "feature usermove=1",
+      "feature setboard=1",
+      "feature ping=1",
+      "feature sigint=0",
+      "feature san=0",
+      "feature variants=\"normal\"",
+      modelTypeString,
+      heuristicTypeString,
+      "feature done=1"
+    )
+  }
 
   def play(): Unit = {
     if(state.possibleMoves.nonEmpty) {
@@ -38,15 +111,8 @@ class EngineProcess(val agent: Agent[ChessState]) extends LazyLogging {
         sys.exit()
 
       case "protover 2" =>
-        printAndLog("feature done=0")
-        printAndLog("feature myname=\"Squire\"")
-        printAndLog("feature usermove=1")
-        printAndLog("feature setboard=1")
-        printAndLog("feature ping=1")
-        printAndLog("feature sigint=0")
-        printAndLog("feature san=0")
-        printAndLog("feature variants=\"normal\"")
-        printAndLog("feature done=1")
+        features.foreach(printAndLog)
+        setAgent()
 
       case s: String if s.startsWith("setboard") =>
         val words = s.split(" ", 2)
@@ -72,7 +138,7 @@ class EngineProcess(val agent: Agent[ChessState]) extends LazyLogging {
         val words = s.split(" ")
         val moveOption = state.decodeAlgebraicNotationMove(words(1))
         moveOption match {
-          case None => printAndLog("Error (ambiguous move): " + words(1))
+          case None => printAndLogError("Error (ambiguous move): " + words(1))
           case Some(move) => {
             if(!state.possibleMoves.contains(move)) {
               printAndLog("Illegal move: " + words(1))
@@ -88,6 +154,23 @@ class EngineProcess(val agent: Agent[ChessState]) extends LazyLogging {
       case s: String if s.startsWith("st") =>
         val words = s.split(" ")
         timePerMove = words(1).toInt * 1000.0
+        setAgent()
+
+      case s: String if s.startsWith("option") =>
+        val theRest = s.stripPrefix("option ")
+        val words = theRest.split("=")
+        Option.values.find(o => o.toString == words(0)) match {
+          case Some(Option.ModelType) => ModelType.values.find(m => m.toString == words(1)) match {
+            case Some(model) => modelType = model
+            case None => logger.error(s"Did not understand model type '${words(1)}'")
+          }
+          case Some(Option.HeuristicType) => HeuristicType.values.find(m => m.toString == words(1)) match {
+            case Some(heuristic) => heuristicType = heuristic
+            case None => logger.error(s"Did not understand heuristic type '${words(1)}'")
+          }
+          case None => logger.error(s"Did not understand option '${words(0)}'")
+        }
+        setAgent()
 
       case s: String if s.startsWith("level") =>
         val words = s.split(" ")
@@ -100,12 +183,18 @@ class EngineProcess(val agent: Agent[ChessState]) extends LazyLogging {
               case Some(totalTime) =>
                 timePerMove = totalTime / n
               case None =>
-                printAndLog("Error (bad time description): " + s)
+                printAndLogError("Error (bad time description): " + s)
             }
           }
         }
+        setAgent()
 
-      case s => printAndLog("Error (unkown command): " + s)
+      case s: String if s.startsWith("sd") =>
+        val words = s.split(" ")
+        maxDepth = words(1).toInt
+        setAgent()
+
+      case s => printAndLogWarning("Error (unkown command): " + s)
     }
   }
 
@@ -115,6 +204,16 @@ class EngineProcess(val agent: Agent[ChessState]) extends LazyLogging {
 
   def printAndLog(s: String): Unit = {
     logger.info(s"Engine answers> $s")
+    println(s) // scalastyle:ignore regex
+  }
+
+  def printAndLogWarning(s: String): Unit = {
+    logger.warn(s"Engine answers> $s")
+    println(s) // scalastyle:ignore regex
+  }
+
+  def printAndLogError(s: String): Unit = {
+    logger.error(s"Engine answers> $s")
     println(s) // scalastyle:ignore regex
   }
 
