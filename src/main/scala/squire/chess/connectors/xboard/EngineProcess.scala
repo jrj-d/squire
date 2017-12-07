@@ -13,8 +13,6 @@ class EngineProcess(val agent: Agent[ChessState]) extends LazyLogging {
 
   var forced = false
   var state = ChessState()
-  var agentTime = 0.0
-  var opponentTime = 0.0
   var timePerMove = 0.0
 
   def play(): Unit = {
@@ -86,14 +84,6 @@ class EngineProcess(val agent: Agent[ChessState]) extends LazyLogging {
             }
           }
         }
-
-      case s: String if s.startsWith("time") =>
-        val words = s.split(" ")
-        agentTime = words(1).toInt * 10.0 // was in centiseconds
-
-      case s: String if s.startsWith("otim") =>
-        val words = s.split(" ")
-        opponentTime = words(1).toInt * 10.0 // was in centiseconds
 
       case s: String if s.startsWith("st") =>
         val words = s.split(" ")
