@@ -486,9 +486,53 @@ case class ChessState(
     (moves ++ specialMoves.result()).filter(!apply(_).isInCheck(color))
   }
 
+  lazy val isDrawByInsufficientMaterial: Boolean = {
+
+    val material: ImmutableMap[Color, ImmutableMap[PieceType, Seq[Position]]] = positions.toSeq
+      .map { case (piece, position) => (piece.color, piece.pieceType, position)}
+      .groupBy(_._1)
+      .mapValues { seq =>
+        val colorMaterial = seq.groupBy(_._2).mapValues(_.map(_._3))
+        colorMaterial - King
+      }
+
+    if(material(White).isEmpty && material(Black).isEmpty) {
+      true
+    } else if(material(White).isEmpty && material(Black).size == 1) {
+      val (lastPieceType, lastPositions) = material(Black).head
+      lastPieceType match {
+        case Knight => true
+        case Bishop => lastPositions.length == 1
+        case _ => false
+      }
+    } else if(material(Black).isEmpty && material(White).size == 1) {
+      val (lastPieceType, lastPositions) = material(White).head
+      lastPieceType match {
+        case Knight => true
+        case Bishop => lastPositions.length == 1
+        case _ => false
+      }
+    } else if(material(White).size == 1 && material(Black).size == 1) {
+      val (lastWhitePieceType, lastWhitePositions) = material(White).head
+      val (lastBlackPieceType, lastBlackPositions) = material(Black).head
+      if(lastBlackPieceType == Bishop && lastWhitePieceType == Bishop
+         && lastBlackPositions.length == 1 && lastWhitePositions.length == 1) {
+        val lastWhitePosition = lastWhitePositions.head
+        val lastBlackPosition = lastBlackPositions.head
+        lastWhitePosition.row + lastWhitePosition.column == lastBlackPosition.row + lastBlackPosition.column
+      } else {
+        false
+      }
+    } else {
+      false
+    }
+  }
+
   def evaluate: Evaluation = {
     if(possibleMoves.isEmpty) {
       if(isInCheck(Color.fromPlayer(currentPlayer))) Finished(-1) else Finished(0)
+    } else if(isDrawByInsufficientMaterial) {
+      Finished(0)
     } else {
       Playing
     }
