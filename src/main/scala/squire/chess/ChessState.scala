@@ -17,15 +17,18 @@ import scala.util.matching.Regex
 // scalastyle:off magic.number
 // scalastyle:off return
 
-case class ChessState(
-                       currentPlayer: Int,
-                       board: Array[Array[Option[ChessPiece]]],
-                       positions: ImmutableMap[ChessPiece, Position],
-                       castlingRights: Array[Array[Boolean]],
-                       enPassantPosition: Option[Position]
-                     ) extends State[ChessState] {
+class ChessState private[chess] (
+                                 val ply: Int,
+                                 val halfMoveClock: Int,
+                                 val board: Array[Array[Option[ChessPiece]]],
+                                 val positions: ImmutableMap[ChessPiece, Position],
+                                 val castlingRights: Array[Array[Boolean]],
+                                 val enPassantPosition: Option[Position]
+                                ) extends State[ChessState] {
 
   type Move = ChessMove
+
+  lazy val currentPlayer: Int = ply % 2
 
   private def getPiece(pos: Position): Option[ChessPiece] = board(pos.row)(pos.column)
 
@@ -42,6 +45,7 @@ case class ChessState(
     val newCastlingRights = castlingRights.map(_.clone)
     var newEnPassantPosition: Option[Position] = None
     var newPositions: ImmutableMap[ChessPiece, Position] = Map.empty[ChessPiece, Position]
+    var resetHalfMoveClock = false
 
     move match {
 
@@ -89,6 +93,11 @@ case class ChessState(
               None
             }
           case _ => None
+        }
+
+        // handle half-move clock
+        deletedPieceOption.foreach { _ =>
+          resetHalfMoveClock = true
         }
 
       }
@@ -155,6 +164,7 @@ case class ChessState(
           case Some(deletedPiece) =>
             if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
             newPositions = positions + (newPiece -> destination) - deletedPiece - pawn
+            resetHalfMoveClock = true
           case None =>
             newPositions = positions + (newPiece -> destination) - pawn
         }
@@ -172,11 +182,13 @@ case class ChessState(
         newBoard(origin.row)(destination.column) = None
         newBoard(origin.row)(origin.column) = None
         newPositions = positions + (piece -> destination) - deletedPiece
+        resetHalfMoveClock = true
       }
     }
 
-    ChessState(
-      (currentPlayer + 1) % 2,
+    new ChessState(
+      ply + 1,
+      if(resetHalfMoveClock) 0 else halfMoveClock + 1,
       newBoard,
       newPositions,
       newCastlingRights,
@@ -531,7 +543,7 @@ case class ChessState(
   def evaluate: Evaluation = {
     if(possibleMoves.isEmpty) {
       if(isInCheck(Color.fromPlayer(currentPlayer))) Finished(-1) else Finished(0)
-    } else if(isDrawByInsufficientMaterial) {
+    } else if(isDrawByInsufficientMaterial || halfMoveClock >= 100) {
       Finished(0)
     } else {
       Playing
@@ -730,6 +742,9 @@ object ChessState {
       case s => decodeAlgebraicNotationPosition(s)
     }
 
+    // parse half-move clock
+    val halfMoveClock = words(4).toInt
+
     // parse turn
     val turn = 2 * (words(5).toInt - 1) + ( if(words(1) == "b") 1 else 0 )
 
@@ -739,8 +754,9 @@ object ChessState {
       piece <- pieceOption.toSeq
     ) yield piece -> Position(row, column)
 
-    ChessState(
-      turn % 2,
+    new ChessState(
+      turn,
+      halfMoveClock,
       board,
       positions.toMap,
       castlingRights,
