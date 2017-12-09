@@ -96,6 +96,9 @@ class ChessState private[chess] (
         }
 
         // handle half-move clock
+        if(piece.pieceType == Pawn) {
+          resetHalfMoveClock = true
+        }
         deletedPieceOption.foreach { _ =>
           resetHalfMoveClock = true
         }
@@ -164,13 +167,15 @@ class ChessState private[chess] (
           case Some(deletedPiece) =>
             if(deletedPiece.pieceType == King) throw new IllegalArgumentException("cannot capture king")
             newPositions = positions + (newPiece -> destination) - deletedPiece - pawn
-            resetHalfMoveClock = true
           case None =>
             newPositions = positions + (newPiece -> destination) - pawn
         }
 
         newBoard(origin.row)(origin.column) = None
         newBoard(destination.row)(destination.column) = Some(newPiece)
+
+        // reset clock because promotion is a pawn move
+        resetHalfMoveClock = true
       }
 
       case EnPassant(origin, destination) => {
