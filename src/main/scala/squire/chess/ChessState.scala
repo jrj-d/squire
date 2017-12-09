@@ -10,7 +10,7 @@ import scala.util.matching.Regex
 
 // This is a straightforward implementation of the rules of chess.
 // There is no modern implementation tricks like bitboards.
-// For performance reasons, some arguments of ChessState are mutable, which defies the purpose of case classes...
+// For performance reasons, some attributes of ChessState are mutable.
 
 // scalastyle:off cyclomatic.complexity
 // scalastyle:off method.length
