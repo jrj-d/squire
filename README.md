@@ -41,8 +41,7 @@ For chess:
 + Test search logic
 + Learn evaluation function
 + Implement quiescence search
-+ Add 50 move clock to engine
-+ Add 3-fold repetition move to engine
++ Implement tests for all draw rules
 
 Outside of chess:
 

@@ -65,8 +65,11 @@ object Performance {
 
       "optimized revamp with threatens" -> { (s: String) =>
         val originalState = ChessState.parseFen(s)
-        new ChessState(originalState.ply, originalState.halfMoveClock, originalState.board, originalState.positions,
-                       originalState.castlingRights, originalState.enPassantPosition) {
+        new ChessState(
+          originalState.ply, originalState.halfMoveClock, originalState.board, originalState.positions,
+          originalState.castlingRights, originalState.enPassantPosition,
+          Map.empty[Int, Int]
+        ) {
           override def isInCheck(color: Color): Boolean = {
             val kingPosition = positions(ChessPiece(color, King, 0))
             positions.keys.filter(_.color != color).map(threatens(_, kingPosition)).reduceLeft(_ || _)

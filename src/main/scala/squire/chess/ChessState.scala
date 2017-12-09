@@ -23,12 +23,17 @@ class ChessState private[chess] (
                                  val board: Array[Array[Option[ChessPiece]]],
                                  val positions: ImmutableMap[ChessPiece, Position],
                                  val castlingRights: Array[Array[Boolean]],
-                                 val enPassantPosition: Option[Position]
+                                 val enPassantPosition: Option[Position],
+                                 previousZobristHashes: ImmutableMap[Int, Int]
                                 ) extends State[ChessState] {
 
   type Move = ChessMove
 
-  lazy val currentPlayer: Int = ply % 2
+  val currentPlayer: Int = ply % 2
+
+  val zobristHash: Int = Zobrist.hash(this)
+
+  val zobristHashes: ImmutableMap[Int, Int] = previousZobristHashes + (zobristHash -> (previousZobristHashes.getOrElse(zobristHash, 0) + 1))
 
   private def getPiece(pos: Position): Option[ChessPiece] = board(pos.row)(pos.column)
 
@@ -197,7 +202,8 @@ class ChessState private[chess] (
       newBoard,
       newPositions,
       newCastlingRights,
-      newEnPassantPosition
+      newEnPassantPosition,
+      zobristHashes
     )
 
   }
@@ -548,7 +554,11 @@ class ChessState private[chess] (
   def evaluate: Evaluation = {
     if(possibleMoves.isEmpty) {
       if(isInCheck(Color.fromPlayer(currentPlayer))) Finished(-1) else Finished(0)
-    } else if(isDrawByInsufficientMaterial || halfMoveClock >= 100) {
+    } else if(isDrawByInsufficientMaterial) {
+      Finished(0)
+    } else if(halfMoveClock >= 100) {
+      Finished(0)
+    } else if(zobristHashes.getOrElse(zobristHash, 0) >= 3) {
       Finished(0)
     } else {
       Playing
@@ -765,7 +775,8 @@ object ChessState {
       board,
       positions.toMap,
       castlingRights,
-      enPassantPosition
+      enPassantPosition,
+      ImmutableMap.empty[Int, Int]
     )
   }
 

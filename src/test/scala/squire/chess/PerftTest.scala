@@ -77,8 +77,11 @@ class PerftTest extends FunSpec with PerftBehaviors {
   for(perft <- perfts) {
 
     val initState = ChessState.parseFen(perft.fen)
-    val alternateState = new ChessState(initState.ply, initState.halfMoveClock, initState.board,
-                                        initState.positions, initState.castlingRights, initState.enPassantPosition) {
+    val alternateState = new ChessState(
+      initState.ply, initState.halfMoveClock, initState.board,
+      initState.positions, initState.castlingRights, initState.enPassantPosition,
+      Map.empty[Int, Int]
+    ) {
       override def isInCheck(color: Color): Boolean = {
         val kingPosition = positions(ChessPiece(color, King, 0))
         positions.keys.filter(_.color != color).map(threatens(_, kingPosition)).reduceLeft(_ || _)
