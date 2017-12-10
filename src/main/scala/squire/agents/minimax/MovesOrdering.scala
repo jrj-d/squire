@@ -2,7 +2,7 @@ package squire.agents.minimax
 
 import squire.base.State
 
-class OrderedAlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends AlphaBetaNegamaxAgent(heuristic, maxDepth) {
+trait MovesOrdering[S <: State[S]] { self: AlphaBetaNegamaxAgent[S] =>
 
   override def possibleMoves(state: S): Seq[(S#Move, S)] = {
     val moves = state.possibleMoves

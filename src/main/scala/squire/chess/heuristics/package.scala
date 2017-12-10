@@ -157,4 +157,12 @@ package object heuristics extends LazyLogging {
 
   }
 
+  def isNotCaptureNorCheckNorPromotion(state: ChessState, move: ChessMove, nextState: ChessState): Boolean = move match {
+    case Promotion(_, _, _) => false
+    case Castling(_, _) => true
+    case EnPassant(_, _) => false
+    case RegularChessMove(_, arrival) if state.getPiece(arrival).nonEmpty => false
+    case _ => !nextState.isInCheck()
+  }
+
 }

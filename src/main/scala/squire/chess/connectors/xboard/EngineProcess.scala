@@ -2,7 +2,7 @@ package squire.chess.connectors.xboard
 
 import com.typesafe.scalalogging.LazyLogging
 import squire.agents.TimeLimitedAgent
-import squire.agents.minimax.{AlphaBetaNegamaxAgent, NegamaxAgent, OrderedAlphaBetaNegamaxAgent}
+import squire.agents.minimax._
 import squire.base.Agent
 import squire.chess.ChessState
 import squire.chess.heuristics._
@@ -26,7 +26,7 @@ object ModelType extends Enumeration {
   val Negamax       = Value("negamax")
   val AlphaBeta     = Value("alpha-beta pruning")
   val MovesOdering  = Value("alpha-beta pruning + moves ordering")
-  //val Quiescence    = Value("alpha-beta pruning + moves ordering + quiescence search")
+  val Quiescence    = Value("alpha-beta pruning + moves ordering + quiescence search")
 }
 
 object HeuristicType extends Enumeration {
@@ -53,8 +53,10 @@ class EngineProcess extends LazyLogging {
     }
     val baseAgent: Int => Agent[ChessState] =
       modelType match {
+        case ModelType.Quiescence =>
+          (d: Int) => new QuiescentAlphaBetaNegamaxAgent[ChessState](heuristic, isNotCaptureNorCheckNorPromotion, d) with MovesOrdering[ChessState]
         case ModelType.MovesOdering =>
-          (d: Int) => new OrderedAlphaBetaNegamaxAgent[ChessState](heuristic, d)
+          (d: Int) => new AlphaBetaNegamaxAgent[ChessState](heuristic, d) with MovesOrdering[ChessState]
         case ModelType.AlphaBeta =>
           (d: Int) => new AlphaBetaNegamaxAgent[ChessState](heuristic, d)
         case ModelType.Negamax =>

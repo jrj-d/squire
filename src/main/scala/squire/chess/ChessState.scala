@@ -35,7 +35,7 @@ class ChessState private[chess] (
 
   val zobristHashes: ImmutableMap[Int, Int] = previousZobristHashes + (zobristHash -> (previousZobristHashes.getOrElse(zobristHash, 0) + 1))
 
-  private def getPiece(pos: Position): Option[ChessPiece] = board(pos.row)(pos.column)
+  def getPiece(pos: Position): Option[ChessPiece] = board(pos.row)(pos.column)
 
   override def apply(move: ChessMove): ChessState = {
 

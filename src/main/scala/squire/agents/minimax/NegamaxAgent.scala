@@ -36,11 +36,12 @@ class NegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends
     }
   }
 
-  def play(state: S): S#Move = findBestMove(state, maxDepth)
+  def play(state: S): S#Move = {
+    counters.reset()
+    findBestMove(state, maxDepth)
+  }
 
   def findBestMove(state: S, depth: Int): S#Move = {
-
-    counters.reset()
 
     val (bestMove, duration) = time {
       state.possibleMoves

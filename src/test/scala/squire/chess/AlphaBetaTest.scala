@@ -1,15 +1,18 @@
 package squire.chess
 
 import org.scalatest.FunSpec
-import squire.agents.minimax.{AlphaBetaNegamaxAgent, NegamaxAgent}
+import squire.agents.minimax.{AlphaBetaNegamaxAgent, MovesOrdering, NegamaxAgent, Result}
 
 import scala.io.{BufferedSource, Source}
+import scala.util.Random
 
 class AlphaBetaTest extends FunSpec {
 
   def equalAgents(state: ChessState, depth: Int): Unit = {
 
-    val randomNumbers = Seq.fill(64)(scala.util.Random.nextDouble)
+    val generator = new Random(42)
+
+    val randomNumbers = Seq.fill(64)(generator.nextDouble)
 
     def heuristic(state: ChessState): Double = {
       val whiteValue = state.board.flatten.zip(randomNumbers).map { case (pieceOption, r) =>
@@ -28,12 +31,17 @@ class AlphaBetaTest extends FunSpec {
 
     val normalAgent = new NegamaxAgent[ChessState](heuristic, depth)
     val abAgent = new AlphaBetaNegamaxAgent[ChessState](heuristic, depth)
+    val movesOrderingABAgent = new AlphaBetaNegamaxAgent[ChessState](heuristic, depth) with MovesOrdering[ChessState]
 
-    val normalMove = normalAgent.play(state)
-    val abMove = abAgent.play(state)
+    val normalValue = normalAgent.negamax(state, depth)
+    val abValue = abAgent.negamax(state, depth, Result(Double.MinValue), Result(Double.MaxValue))
+    val moabValue = movesOrderingABAgent.negamax(state, depth, Result(Double.MinValue), Result(Double.MaxValue))
 
-    it(s"should find the same best move $normalMove") {
-      assert(normalMove == abMove)
+    it(s"negamax and alpha beta should output the same value $normalValue") {
+      assert(normalValue == abValue)
+    }
+    it(s"negamax and ordered alpha beta should output the same value $normalValue") {
+      assert(normalValue == moabValue)
     }
   }
 
@@ -44,7 +52,7 @@ class AlphaBetaTest extends FunSpec {
 
     val state = ChessState.parseFen(perft.fen)
 
-    describe("From " + perft.fen + " at depth " + perft.depth + ", normal negamax and alpha beta negamax agents") {
+    describe("For " + perft.fen + " at depth " + perft.depth + ",") {
       it should behave like equalAgents(state, perft.depth)
     }
 

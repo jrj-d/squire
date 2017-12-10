@@ -6,18 +6,21 @@ import squire.utils.time
 
 // scalastyle:off method.length
 
-class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends Agent[S] with LazyLogging {
+class AlphaBetaNegamaxAgent[S <: State[S]](val heuristic: S => Double, maxDepth: Int) extends Agent[S] with LazyLogging {
 
   val counters = new Counters
 
-  def play(state: S): S#Move = findBestMove(state, maxDepth)
+  def play(state: S): S#Move = {
+    counters.reset()
+    findBestMove(state, maxDepth)
+  }
 
   def possibleMoves(state: S): Seq[(S#Move, S)] = {
     val moves = state.possibleMoves
     moves.zip(moves.map(state.apply))
   }
 
-  def evaluateLeafNode(state: S, alpha: Score, beta: Score): Score = {
+  def evaluateStatically(state: S): Score = {
     val value = heuristic(state)
     counters.evaluatedHeuristics += 1
     counters.leafNodes += 1
@@ -36,7 +39,7 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
         Result(result)
       case Playing =>
         if(depth == 0) {
-          evaluateLeafNode(state, alpha, beta)
+          evaluateStatically(state)
         } else {
           var bestValue: Score = Result(Double.MinValue)
           var currentAlpha = alpha
@@ -56,8 +59,6 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
   }
 
   def findBestMove(state: S, depth: Int): S#Move = {
-
-    counters.reset()
 
     val (bestMove, duration) = time {
       val moves = possibleMoves(state)
