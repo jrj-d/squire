@@ -7,6 +7,7 @@ class Counters {
   var evaluatedHeuristics = 0L
   var betaCutoffs = 0L
   var finalNodes = 0L
+  var leafNodes = 0L
 
   def print(duration: Double): String = {
     val table = Seq(
@@ -19,5 +20,13 @@ class Counters {
       Seq("final nodes", finalNodes),
     )
     Tabulator.format(table)
+  }
+
+  def reset(): Unit = {
+    traversedNodes = 0L
+    evaluatedHeuristics = 0L
+    betaCutoffs = 0L
+    finalNodes = 0L
+    leafNodes = 0L
   }
 }

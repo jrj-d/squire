@@ -7,6 +7,7 @@ class OrderedAlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDep
   override def possibleMoves(state: S): Seq[(S#Move, S)] = {
     val moves = state.possibleMoves
     val zipped = moves.zip(moves.map(state.apply))
+    counters.evaluatedHeuristics += moves.length
     zipped.sortBy(t => heuristic(t._2))
   }
 

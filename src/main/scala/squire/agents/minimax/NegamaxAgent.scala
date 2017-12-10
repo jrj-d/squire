@@ -6,37 +6,41 @@ import squire.utils.time
 
 class NegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int) extends Agent[S] with LazyLogging {
 
+  val counters = new Counters
+
+  def negamax(state: S, depth: Int): Score = {
+    counters.traversedNodes += 1
+    logger.debug(s"Remaining depth is $depth, evaluating\n$state")
+    state.evaluate match {
+      case Finished(result) => {
+        logger.debug(s"State is final: $result")
+        counters.finalNodes += 1
+        counters.leafNodes += 1
+        Result(result)
+      }
+      case Playing =>
+        if(depth == 0) {
+          val value = heuristic(state)
+          counters.evaluatedHeuristics += 1
+          counters.leafNodes += 1
+          logger.debug(s"Heuristic evaluation: $value")
+          Heuristic(value)
+        } else {
+          val value = state.possibleMoves
+            .map(state.apply)
+            .map(negamax(_, depth - 1).invert)
+            .max
+          logger.debug(s"Minimax evaluation: $value")
+          value
+        }
+    }
+  }
+
   def play(state: S): S#Move = findBestMove(state, maxDepth)
 
   def findBestMove(state: S, depth: Int): S#Move = {
 
-    val counters = new Counters
-
-    def negamax(state: S, depth: Int): Score = {
-      counters.traversedNodes += 1
-      logger.debug(s"Remaining depth is $depth, evaluating\n$state")
-      state.evaluate match {
-        case Finished(result) => {
-          logger.debug(s"State is final: $result")
-          counters.finalNodes += 1
-          Result(result)
-        }
-        case Playing =>
-          if(depth == 0) {
-            val value = heuristic(state)
-            counters.evaluatedHeuristics += 1
-            logger.debug(s"Heuristic evaluation: $value")
-            Heuristic(value)
-          } else {
-            val value = state.possibleMoves
-              .map(state.apply)
-              .map(negamax(_, depth - 1).invert)
-              .max
-            logger.debug(s"Minimax evaluation: $value")
-            value
-          }
-      }
-    }
+    counters.reset()
 
     val (bestMove, duration) = time {
       state.possibleMoves
