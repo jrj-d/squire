@@ -18,6 +18,7 @@ class Counters {
       Seq("evaluated heuristics", evaluatedHeuristics),
       Seq("beta cutoffs", betaCutoffs),
       Seq("final nodes", finalNodes),
+      Seq("leaf nodes", leafNodes)
     )
     Tabulator.format(table)
   }

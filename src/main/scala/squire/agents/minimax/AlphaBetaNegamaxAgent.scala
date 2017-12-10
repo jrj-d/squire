@@ -17,6 +17,14 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
     moves.zip(moves.map(state.apply))
   }
 
+  def evaluateLeafNode(state: S, alpha: Score, beta: Score): Score = {
+    val value = heuristic(state)
+    counters.evaluatedHeuristics += 1
+    counters.leafNodes += 1
+    logger.debug(s"Heuristic evaluation: $value")
+    Heuristic(value)
+  }
+
   def negamax(state: S, depth: Int, alpha: Score, beta: Score): Score = {
     counters.traversedNodes += 1
     logger.debug(s"Remaining depth is $depth, evaluating\n$state")
@@ -28,11 +36,7 @@ class AlphaBetaNegamaxAgent[S <: State[S]](heuristic: S => Double, maxDepth: Int
         Result(result)
       case Playing =>
         if(depth == 0) {
-          val value = heuristic(state)
-          counters.evaluatedHeuristics += 1
-          counters.leafNodes += 1
-          logger.debug(s"Heuristic evaluation: $value")
-          Heuristic(value)
+          evaluateLeafNode(state, alpha, beta)
         } else {
           var bestValue: Score = Result(Double.MinValue)
           var currentAlpha = alpha
